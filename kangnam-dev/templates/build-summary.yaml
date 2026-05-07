@@ -1,0 +1,23 @@
+# #31 Build Summary 문서화
+# 흡수 대상: 없음
+# 흡수 주체: 없음 (파이프라인 종료까지 유지)
+step: 31
+agent: writer
+status: PASS
+timestamp: "{ISO 8601}"
+document:
+  path: "{project}/docs/llm/build-summary.md"
+  sections:
+    - title: "구현 파일 목록"
+      source: "#27 구현"
+      content: "생성/수정 파일별 경로 + 설명"
+    - title: "리뷰 결과"
+      source: "#28 DBA + #29 코드/보안 리뷰"
+      content: "지적 사항 + 해결 내역"
+    - title: "테스트 결과"
+      source: "#30 테스트"
+      content: "통과/실패 수, 커버리지, 실패 해결 내역"
+    - title: "실행 방법"
+      source: "#27 구현"
+      content: "실행 명령, 환경 변수, 필수 설정"
+next_step: 32

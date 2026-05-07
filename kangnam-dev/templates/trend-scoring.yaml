@@ -1,0 +1,20 @@
+# #3 트렌드 스코어링 (선택)
+step: 3
+agent: researcher
+status: PASS
+timestamp: "{ISO 8601}"
+content:
+  topics_analyzed: "{분석 주제 수}"
+  rankings:
+    - rank: 1
+      topic: "{주제명}"
+      trend_score: "{0-100 점수}"
+      momentum: "{상승 | 유지 | 하락}"
+      relevance: "{앱 아이디어와의 관련성 1문장}"
+    - rank: 2
+      topic: "{주제명}"
+      trend_score: "{0-100 점수}"
+      momentum: "{상승 | 유지 | 하락}"
+      relevance: "{앱 아이디어와의 관련성 1문장}"
+  recommendation: "{트렌드 기반 추천 방향 1-2문장}"
+next_step: 4

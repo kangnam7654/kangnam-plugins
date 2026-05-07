@@ -1,0 +1,17 @@
+# #36 완성 보고
+step: 36
+agent: main-model
+status: COMPLETE
+timestamp: "{ISO 8601}"
+project_name: "{프로젝트 이름}"
+tech_stack:
+  - "{기술 1}"
+  - "{기술 2}"
+artifacts:
+  design_doc: "{설계문서 경로}"
+  source_code: "{소스코드 루트 경로}"
+  test_report: "{테스트 결과 경로}"
+run_method: "{실행 방법 (명령어)}"
+total_steps_executed: "{실행된 단계 수}"
+total_loops: "{총 루프 횟수}"
+human_escalations: "{사용자 보고 횟수}"

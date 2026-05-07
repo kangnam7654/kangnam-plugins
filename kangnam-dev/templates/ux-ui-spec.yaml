@@ -1,0 +1,29 @@
+# #22 UX-UI Spec 문서화
+# 흡수 대상: 없음
+# 흡수 주체: design-spec.md (#26) 생성 시 삭제
+step: 22
+agent: writer
+status: PASS
+timestamp: "{ISO 8601}"
+document:
+  path: "{project}/docs/llm/ux-ui-spec.md"
+  sections:
+    - title: "페르소나"
+      source: "#17 UX 설계"
+      content: "이름, 나이, 역할, 목표, 고충, 기술 수준"
+    - title: "유저 플로우"
+      source: "#17 UX 설계"
+      content: "주요 플로우별 화면→액션 시퀀스"
+    - title: "정보 구조 (IA)"
+      source: "#17 UX 설계"
+      content: "섹션별 하위 항목 트리"
+    - title: "디자인 시스템"
+      source: "#19 UI 디자인"
+      content: "색상, 타이포, 간격, border-radius, 컴포넌트 목록"
+    - title: "화면 목록 + 목업"
+      source: "#19 UI 디자인"
+      content: "화면별 설명, 목업 파일 경로, 사용 도구"
+    - title: "디자인 디베이트 결과"
+      source: "#21 디베이트"
+      content: "합의 항목, CTO 판정 사항 (있을 경우)"
+next_step: 23

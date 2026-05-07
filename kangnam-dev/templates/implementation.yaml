@@ -1,0 +1,18 @@
+# #27 구현 (각 트랙별)
+step: 27
+agent: "{frontend-dev | backend-dev | mobile-dev | ai-engineer}"
+track: "{frontend | backend | mobile | ai}"
+status: PASS
+timestamp: "{ISO 8601}"
+content:
+  files_created:
+    - path: "{파일 경로}"
+      description: "{설명}"
+  files_modified:
+    - path: "{파일 경로}"
+      description: "{변경 내용}"
+  tests_written:
+    - path: "{테스트 파일 경로}"
+      covers: "{테스트 대상}"
+  run_command: "{실행 명령}"
+next_step: 28

@@ -1,0 +1,15 @@
+# #4 CEO 방향 결정
+step: 4
+agent: CEO
+status: PASS
+timestamp: "{ISO 8601}"
+content:
+  app_name: "{앱 이름}"
+  one_liner: "{한 문장 요약}"
+  target_user: "{타겟 사용자}"
+  core_features:
+    - "{핵심 기능 1}"
+    - "{핵심 기능 2}"
+    - "{핵심 기능 3}"
+  differentiation: "{차별점}"
+next_step: 5

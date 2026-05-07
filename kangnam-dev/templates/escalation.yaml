@@ -1,0 +1,12 @@
+# 사용자 보고 (human-in-loop)
+step: "{단계 번호}"
+agent: "{에이전트 이름}"
+status: ESCALATE
+timestamp: "{ISO 8601}"
+summary: "{1문장 요약}"
+detail: "{실패 이유 3줄 이내}"
+loop_count: "{현재 루프 횟수}"
+artifacts_saved:
+  - "{파일 경로 1}"
+  - "{파일 경로 2}"
+action_required: "사용자가 방향을 결정해야 합니다."

@@ -1,0 +1,18 @@
+# #2 브레인스토밍 (선택)
+step: 2
+agent: CEO
+status: PASS
+timestamp: "{ISO 8601}"
+content:
+  session_type: "{사용자 참여 | CEO 단독}"
+  ideas:
+    - name: "{아이디어 이름}"
+      description: "{1-2문장 설명}"
+      target_user: "{타겟 사용자}"
+      feasibility: "{상/중/하}"
+    - name: "{아이디어 이름}"
+      description: "{1-2문장 설명}"
+      target_user: "{타겟 사용자}"
+      feasibility: "{상/중/하}"
+  selected_idea: "{선택된 아이디어 이름 또는 N/A (미결정 시)}"
+next_step: "{3 | 4}"

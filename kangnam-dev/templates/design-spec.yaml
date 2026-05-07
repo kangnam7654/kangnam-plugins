@@ -1,0 +1,27 @@
+# #26 Design Spec 문서화 (통합)
+# 흡수 대상: idea-brief.md, arch-spec.md, ux-ui-spec.md → 흡수 후 삭제
+# 흡수 주체: 없음 (파이프라인 종료까지 유지)
+step: 26
+agent: writer
+status: PASS
+timestamp: "{ISO 8601}"
+document:
+  path: "{project}/docs/llm/design-spec.md"
+  absorbs:
+    - "{project}/docs/llm/idea-brief.md"
+    - "{project}/docs/llm/arch-spec.md"
+    - "{project}/docs/llm/ux-ui-spec.md"
+  sections:
+    - title: "프로젝트 개요"
+      source: "idea-brief.md 흡수"
+    - title: "아키텍처"
+      source: "arch-spec.md 흡수"
+    - title: "UX/UI"
+      source: "ux-ui-spec.md 흡수"
+    - title: "실행 계획"
+      source: "#23 planner + #24 critic (plan mode)"
+      content: "파일 구조, 구현 순서, 병렬 트랙"
+    - title: "CTO 게이트 승인"
+      source: "#25 Design 게이트"
+      content: "승인 사유, 조건부 사항"
+next_step: 27

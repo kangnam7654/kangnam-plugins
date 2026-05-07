@@ -1,0 +1,14 @@
+# 디베이트 결과 (#21 디자인, #35 론칭)
+step: "{21 | 35}"
+agents: ["{참여 에이전트 1}", "{참여 에이전트 2}"]
+mediator: main-model
+status: "{CONSENSUS | ESCALATE}"
+timestamp: "{ISO 8601}"
+rounds: "{토론 라운드 수}"
+consensus_summary: "{합의 내용 요약}"
+action_items:
+  - agent: "{수정 담당 에이전트}"
+    instruction: "{수정 지시}"
+# ESCALATE 시 (#21): CTO 최종 판정
+# ESCALATE 시 (#35): 코드 수정만 필요(Build Phase 범위)→#27, 설계 변경 또는 아이디어 재검토 필요(Design/Idea Phase 범위)→사용자 보고
+next_step: "{다음 단계 번호}"

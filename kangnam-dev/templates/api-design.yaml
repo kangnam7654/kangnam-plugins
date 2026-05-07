@@ -1,0 +1,20 @@
+# #13 API 상세 설계
+step: 13
+agent: backend-dev
+status: PASS
+timestamp: "{ISO 8601}"
+content:
+  endpoints:
+    - method: "{GET | POST | PUT | DELETE}"
+      path: "{/api/v1/resource}"
+      description: "{엔드포인트 설명}"
+      request_schema:
+        body: "{JSON 스키마 또는 N/A}"
+        params: "{파라미터 목록 또는 N/A}"
+        query: "{쿼리 파라미터 또는 N/A}"
+      response_schema:
+        success: "{JSON 스키마}"
+        error: "{에러 응답 스키마}"
+      auth_required: "{true | false}"
+  total_endpoints: "{숫자}"
+next_step: 14

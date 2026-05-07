@@ -1,0 +1,26 @@
+# #9 Idea Brief 문서화
+# 흡수 대상: 없음 (최초 문서)
+# 흡수 주체: design-spec.md (#26) 생성 시 삭제
+step: 9
+agent: writer
+status: PASS
+timestamp: "{ISO 8601}"
+document:
+  path: "{project}/docs/llm/idea-brief.md"
+  sections:
+    - title: "프로젝트 개요"
+      source: "#4 CEO 방향 결정"
+      content: "앱명, 타겟 사용자, 핵심 기능 3개, 차별점"
+    - title: "시장 분석"
+      source: "#5 시장 조사"
+      content: "TAM/SAM/SOM, 주요 경쟁사, 기회/리스크 요약"
+    - title: "전략 검증"
+      source: "#6 CSO 검증"
+      content: "Go/No-Go 결과, 핵심 리스크 대응"
+    - title: "비즈니스 모델"
+      source: "#7 BM 설계"
+      content: "수익 모델, 가격 티어, LTV/CAC, BM Score"
+    - title: "CEO 최종 방향"
+      source: "#8 Idea 게이트"
+      content: "승인 사유, 조정 사항"
+next_step: 10

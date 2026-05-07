@@ -1,0 +1,18 @@
+# #5 시장 조사
+step: 5
+agent: researcher
+status: PASS
+timestamp: "{ISO 8601}"
+content:
+  market_size:
+    tam: "{전체 시장 규모}"
+    sam: "{유효 시장 규모}"
+    som: "{확보 가능 시장 규모}"
+  competitors:
+    - name: "{경쟁사 1}"
+      strength: "{강점}"
+      weakness: "{약점}"
+      pricing: "{가격 모델}"
+  opportunity: "{기회 요약}"
+  risk: "{리스크 요약}"
+next_step: 6

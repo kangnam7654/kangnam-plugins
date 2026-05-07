@@ -1,0 +1,26 @@
+# #16 Arch Spec 문서화
+# 흡수 대상: 없음
+# 흡수 주체: design-spec.md (#26) 생성 시 삭제
+step: 16
+agent: writer
+status: PASS
+timestamp: "{ISO 8601}"
+document:
+  path: "{project}/docs/llm/arch-spec.md"
+  sections:
+    - title: "기술 스택"
+      source: "#10 CTO 기술 스택"
+      content: "프레임워크, DB, 인증, API 표준, 디자인 도구, ADR 경로"
+    - title: "테스트 도구 매핑"
+      source: "#10 testing_tools"
+      content: "app_verification 도구 (iOS Simulator MCP / Playwright / 둘 다)"
+    - title: "DB 스키마"
+      source: "#11 data-engineer + #12 CTO 리뷰"
+      content: "ERD, 테이블 정의, 인덱스, RLS, 마이그레이션 경로"
+    - title: "API 명세"
+      source: "#13 backend-dev + #14 CTO 리뷰"
+      content: "엔드포인트 목록, 요청/응답 스키마, 인증 요구사항"
+    - title: "DB-API 정합성"
+      source: "#15 CTO 정합성 검증"
+      content: "크로스체크 결과, 해결된 불일치 항목"
+next_step: 17

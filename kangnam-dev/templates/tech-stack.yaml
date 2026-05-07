@@ -1,0 +1,27 @@
+# #10 기술 스택 + API 표준
+step: 10
+agent: CTO
+status: PASS
+timestamp: "{ISO 8601}"
+content:
+  tech_stack:
+    frontend: "{프레임워크: Next.js | React | N/A}"
+    backend: "{프레임워크: Express | FastAPI | N/A}"
+    database: "{DB: PostgreSQL | Supabase | N/A}"
+    mobile: "{React Native | N/A}"
+    infra: "{배포 환경: Vercel | AWS | N/A}"
+  api_standard:
+    protocol: "{REST | GraphQL}"
+    auth: "{인증 방식: JWT | OAuth | N/A}"
+    versioning: "{버저닝: URL path /v1 | header}"
+    naming_convention: "{snake_case | camelCase}"
+    error_format: "{에러 응답 구조}"
+  design_tool: "{HTML/CSS 목업 | Stitch MCP}"
+  trade_off:
+    options_compared: ["{옵션 1}", "{옵션 2}"]
+    scores: "{trade-off-framework 참조}"
+  adr_path: "{docs/adr/ADR-NNN-slug.md}"
+  testing_tools:
+    app_verification: "{iOS Simulator MCP | Playwright | 둘 다}"
+    trigger: "{mobile 필드가 React Native이면 iOS Simulator MCP 포함}"
+next_step: 11

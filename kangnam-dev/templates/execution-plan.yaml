@@ -1,0 +1,31 @@
+# #23 실행 계획 + 파일 구조
+step: 23
+agent: planner
+status: PASS
+timestamp: "{ISO 8601}"
+content:
+  file_structure: |
+    {project}/
+    ├── src/
+    │   ├── {파일 1}
+    │   └── {파일 2}
+    ├── tests/
+    │   └── {테스트 파일}
+    └── {설정 파일}
+  implementation_order:
+    - phase: 1
+      description: "{설명}"
+      agent: "{담당 에이전트}"
+      files: ["{파일 경로}"]
+      depends_on: []
+    - phase: 2
+      description: "{설명}"
+      agent: "{담당 에이전트}"
+      files: ["{파일 경로}"]
+      depends_on: [1]
+  parallel_tracks:
+    - track: "{frontend | backend | mobile | ai}"
+      agent: "{담당 에이전트}"
+      phases: ["{해당 phase 번호}"]
+  design_doc_path: "{설계문서 경로}"
+next_step: 24

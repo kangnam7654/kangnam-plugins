@@ -1,0 +1,22 @@
+# 리뷰/검증 공통 (#6,#12,#14,#15,#18,#20,#24,#28,#29,#30,#32,#33,#34)
+# 주의: #25는 gate-decision.yaml 사용. #8도 gate-decision.yaml 사용.
+step: "{단계 번호}"
+agent: "{에이전트 이름}"
+status: PASS  # PASS | FAIL
+timestamp: "{ISO 8601}"
+score:
+  total: "{가중 평균 총점}"
+  criteria:
+    - name: "{기준 이름}"
+      weight: "{가중치 0.XX}"
+      score: "{0-10 점수}"
+    - name: "{기준 이름}"
+      weight: "{가중치 0.XX}"
+      score: "{0-10 점수}"
+  primary_criterion: "{최고 가중치 기준 이름}"
+  primary_score: "{해당 점수}"
+pass_condition: "total > 8.0 AND primary_score >= 7"
+verdict: "{PASS | FAIL}"
+feedback:
+  - "{수정 지시 사항 (FAIL 시)}"
+next_step: "{다음 단계 번호}"

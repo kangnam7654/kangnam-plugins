@@ -1,0 +1,25 @@
+# #11 DB 스키마
+step: 11
+agent: data-engineer
+status: PASS
+timestamp: "{ISO 8601}"
+content:
+  erd_mermaid: |
+    erDiagram
+      {Mermaid ERD 코드}
+  tables:
+    - name: "{테이블명}"
+      columns:
+        - name: "{컬럼명}"
+          type: "{데이터 타입}"
+          constraints: "{PK | FK | NOT NULL | UNIQUE | 조합}"
+      indexes:
+        - columns: ["{컬럼명}"]
+          type: "{BTREE | GIN | UNIQUE}"
+      rls: "{RLS 정책 설명 또는 N/A}"
+  relationships:
+    - from: "{테이블.컬럼}"
+      to: "{테이블.컬럼}"
+      type: "{1:N | N:M | 1:1}"
+  migrations_path: "{마이그레이션 파일 경로}"
+next_step: 12

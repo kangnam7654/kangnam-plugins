@@ -1,0 +1,12 @@
+# 게이트키퍼 결정 (#8 CEO, #25 CTO)
+step: "{8 | 25}"
+agent: "{CEO | CTO}"
+status: PASS  # PASS | FAIL
+timestamp: "{ISO 8601}"
+decision: "{PASS | BM_REVISION | DIRECTION_CHANGE}"  # #8 CEO용
+# decision: "{PASS | ARCH_REVISION | UXUI_REVISION | PLAN_REVISION | ESCALATE}"  # #25 CTO용
+reason: "{판단 이유 1-2문장}"
+next_step: "{다음 단계 번호}"
+# PASS→다음 Phase, BM_REVISION→#7, DIRECTION_CHANGE→#4 (#8)
+# PASS→#27, ARCH_REVISION→#10, UXUI_REVISION→#17, PLAN_REVISION→#23, ESCALATE→사용자 보고 (#25)
+loop_count: "{현재 루프 횟수, 최대 10}"

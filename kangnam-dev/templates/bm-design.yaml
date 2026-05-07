@@ -1,0 +1,26 @@
+# #7 BM 설계
+step: 7
+agent: bm-designer
+status: PASS
+timestamp: "{ISO 8601}"
+content:
+  revenue_model: "{수익 모델 유형: 구독/프리미엄/광고/트랜잭션}"
+  pricing:
+    tiers:
+      - name: "{티어 이름}"
+        price: "{가격}"
+        features: ["{기능 1}", "{기능 2}"]
+  unit_economics:
+    cac: "{고객 획득 비용}"
+    ltv: "{고객 생애 가치}"
+    ltv_cac_ratio: "{LTV/CAC 비율}"
+    monthly_churn: "{월간 이탈률}"
+    arpu: "{유저당 평균 수익}"
+  bm_score:
+    total: "{0-10 수치}"
+    criteria:
+      - name: "{기준 1}"
+        score: "{점수}"
+      - name: "{기준 2}"
+        score: "{점수}"
+next_step: 8

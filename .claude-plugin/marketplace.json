@@ -1,0 +1,21 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "kangnam-local",
+  "owner": {
+    "name": "kangnam7654"
+  },
+  "metadata": {
+    "description": "Kangnam personal local marketplace — synced via ai-config-sync"
+  },
+  "plugins": [
+    {
+      "name": "kangnam-dev",
+      "source": "./kangnam-dev",
+      "description": "End-to-end service development pipeline skills: ideation → design → implementation → improvement loops.",
+      "author": {
+        "name": "kangnam7654"
+      },
+      "category": "development"
+    }
+  ]
+}

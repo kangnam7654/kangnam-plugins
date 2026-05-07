@@ -1,0 +1,47 @@
+{
+  "skill_name": "service-dev",
+  "evals": [
+    {
+      "id": 1,
+      "name": "fresh-idea-no-design",
+      "prompt": "나 서비스 하나 만들고 싶어. 개발자들이 매일 쓰는 코드 스니펫을 저장하고 검색할 수 있는 CLI 도구야. 팀끼리 공유도 되면 좋겠고. 디자인은 필요 없어 CLI니까.",
+      "expected_output": "Phase 0 시작: 사용자에게 서비스 개요/핵심 기능/타겟/BM 4가지를 정리하여 확인 요청. 디자인 불필요 확인. 서비스 이름 확인. Phase 2 스킵 예고.",
+      "assertions": [
+        "Phase 0 산출물 4가지(서비스 개요, 핵심 기능, 타겟 사용자, BM 요약)를 사용자에게 제시한다",
+        "사용자에게 산출물 승인을 요청한다",
+        "서비스 이름을 확인한다",
+        "디자인 불필요를 인지하고 Phase 2 스킵을 명시한다",
+        "idea-forge를 호출하지 않는다 (사용자가 직접 아이디어를 제공했으므로)"
+      ],
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "idea-forge-output-with-design",
+      "prompt": "idea-forge에서 '반려동물 건강 관리 SaaS'로 검증 완료했어. BM도 나왔고. 이제 이걸로 서비스 개발 시작하자. 모바일 웹이라 디자인도 필요해.",
+      "expected_output": "idea-forge 산출물 존재를 확인하고 Phase 0 산출물로 변환. Phase 2(Design) 포함 예고. Phase 1(Plan)으로 진행 준비.",
+      "assertions": [
+        "idea-forge 산출물을 찾거나 사용자에게 산출물 위치를 확인한다",
+        "Phase 0 산출물 4가지 형식으로 정리한다",
+        "디자인 필요를 인지하고 Phase 2 포함을 명시한다",
+        "서비스 이름을 확인한다",
+        "사용자 승인 후 Phase 1(Plan)으로 진행할 것임을 안내한다"
+      ],
+      "files": []
+    },
+    {
+      "id": 3,
+      "name": "resume-from-spec",
+      "prompt": "지난번에 하던 taskflow 프로젝트 이어서 하자. docs/taskflow/ 에 design.md랑 spec.md 까지 만들어놨어.",
+      "expected_output": "docs/taskflow/ 디렉토리를 확인하여 Phase 3까지 완료된 것을 판단. design.md와 spec.md를 읽어 컨텍스트 복원. Phase 4(Build)부터 재개.",
+      "assertions": [
+        "docs/taskflow/ 디렉토리를 확인한다",
+        "design.md 존재로 Phase 1 완료를 판단한다",
+        "spec.md 존재로 Phase 3 완료를 판단한다",
+        "spec.md를 읽어 모듈 목록과 구현 순서를 파악한다",
+        "Phase 4(Build)부터 재개한다고 안내한다"
+      ],
+      "files": []
+    }
+  ]
+}
