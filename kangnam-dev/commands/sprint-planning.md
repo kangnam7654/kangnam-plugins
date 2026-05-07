@@ -28,7 +28,7 @@ Raw slash-command arguments:
 
 ```bash
 git -C ~/wiki pull --rebase
-uv run ~/.claude/plugins/marketplaces/kangnam-local/kangnam-dev/scripts/sprint/sprint-planning.py $ARGUMENTS
+uv run ~/.claude/plugins/marketplaces/kangnam-plugins/kangnam-dev/scripts/sprint/sprint-planning.py $ARGUMENTS
 ```
 
 스크립트가 처리:
@@ -190,7 +190,7 @@ PASS이면 사용자에게 한 줄 확인:
 `yes`이면 단일 스크립트 호출:
 
 ```bash
-uv run ~/.claude/plugins/marketplaces/kangnam-local/kangnam-dev/scripts/sprint/sprint-publish-cards.py <project> <version>
+uv run ~/.claude/plugins/marketplaces/kangnam-plugins/kangnam-dev/scripts/sprint/sprint-publish-cards.py <project> <version>
 ```
 
 스크립트가 한 번에 처리:

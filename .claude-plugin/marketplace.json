@@ -1,6 +1,6 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-  "name": "kangnam-local",
+  "name": "kangnam-plugins",
   "owner": {
     "name": "kangnam7654"
   },

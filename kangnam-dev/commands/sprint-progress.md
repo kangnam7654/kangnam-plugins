@@ -16,7 +16,7 @@ Raw slash-command arguments:
 ### Step 1 · 스크립트 실행
 
 ```bash
-uv run ~/.claude/plugins/marketplaces/kangnam-local/kangnam-dev/scripts/sprint/sprint-progress.py $ARGUMENTS
+uv run ~/.claude/plugins/marketplaces/kangnam-plugins/kangnam-dev/scripts/sprint/sprint-progress.py $ARGUMENTS
 ```
 
 세 가지 모드로 동작:

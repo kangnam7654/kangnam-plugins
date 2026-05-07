@@ -16,7 +16,7 @@ Raw slash-command arguments:
 ### Step 1 · 스캐폴드
 
 ```bash
-uv run ~/.claude/plugins/marketplaces/kangnam-local/kangnam-dev/scripts/sprint/sprint-review.py $ARGUMENTS
+uv run ~/.claude/plugins/marketplaces/kangnam-plugins/kangnam-dev/scripts/sprint/sprint-review.py $ARGUMENTS
 ```
 
 스크립트 동작:
