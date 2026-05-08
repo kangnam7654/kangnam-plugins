@@ -86,7 +86,7 @@ def build_gate_blocks(gates: list[str]) -> str:
     return "\n\n".join(blocks)
 
 
-DATE_RE = re.compile(r"\b\d{4}-\d{2}-\d{2}\b")
+DATE_RE = re.compile(r"(?<![\d-])\d{4}-\d{2}-\d{2}(?![\d-])")
 PLACEHOLDER_FRAGMENTS = ("검증 메모, 날짜>", "<검증", "**채워주세요**", "TODO", "TBD")
 MEMO_MIN_CHARS = 20  # 게이트 검증 메모 최소 길이 (체크박스/볼드 제외)
 
