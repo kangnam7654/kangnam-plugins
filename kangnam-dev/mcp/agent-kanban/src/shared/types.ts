@@ -8,11 +8,13 @@ export const COLUMN_DEFINITIONS = [
 ] as const;
 
 export const PRIORITIES = ["urgent", "high", "medium", "low"] as const;
+export const CARD_KINDS = ["epic", "task"] as const;
 export const TEST_STATUSES = ["passed", "failed", "skipped"] as const;
 export const SESSION_OUTCOMES = ["continued", "blocked", "completed", "abandoned"] as const;
 
 export type CardStatus = (typeof COLUMN_DEFINITIONS)[number]["id"];
 export type Priority = (typeof PRIORITIES)[number];
+export type CardKind = (typeof CARD_KINDS)[number];
 export type TestStatus = (typeof TEST_STATUSES)[number];
 export type SessionOutcome = (typeof SESSION_OUTCOMES)[number];
 
@@ -59,6 +61,8 @@ export interface KanbanCard {
   id: string;
   title: string;
   description: string;
+  kind: CardKind;
+  epicId?: string | undefined;
   status: CardStatus;
   priority: Priority;
   project: string;
@@ -105,6 +109,8 @@ export interface KanbanData {
 
 export interface CardFilters {
   status?: CardStatus | undefined;
+  kind?: CardKind | undefined;
+  epicId?: string | undefined;
   project?: string | undefined;
   cwd?: string | undefined;
   branch?: string | undefined;
@@ -127,6 +133,8 @@ export interface PaginatedCards {
 
 export interface BoardMetrics {
   total: number;
+  epics: number;
+  tasks: number;
   active: number;
   blocked: number;
   review: number;
@@ -150,6 +158,8 @@ export interface CreateCardInput {
   title: string;
   description?: string | undefined;
   status?: CardStatus | undefined;
+  kind?: CardKind | undefined;
+  epicId?: string | undefined;
   priority?: Priority | undefined;
   project?: string | undefined;
   cwd?: string | undefined;

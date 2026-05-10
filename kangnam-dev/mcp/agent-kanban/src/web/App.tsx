@@ -1,28 +1,27 @@
 import {
   Activity,
-  ArrowRight,
   BadgeCheck,
   Ban,
   Blocks,
-  Check,
+  CheckCircle2,
   ClipboardList,
   FileCode2,
   GitBranch,
-  GripVertical,
+  Layers3,
   ListFilter,
   Loader2,
   MessageSquarePlus,
+  MoveRight,
   Plus,
   RefreshCw,
   Search,
-  ShieldAlert,
-  Sparkles,
   TerminalSquare,
   UserRound
 } from "lucide-react";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type { FormEvent, ReactNode } from "react";
 import { COLUMN_DEFINITIONS } from "../shared/types.js";
-import type { ActivityEntry, BoardMetrics, CardStatus, KanbanCard, Priority, TestStatus } from "../shared/types.js";
+import type { ActivityEntry, BoardMetrics, CardKind, CardStatus, CreateCardInput, KanbanCard, Priority, TestStatus } from "../shared/types.js";
 import {
   appendProgress,
   blockCard,
@@ -36,6 +35,15 @@ import {
 } from "./lib/api.js";
 
 const statusOrder = COLUMN_DEFINITIONS.map((column) => column.id);
+const initialCwd = new URLSearchParams(window.location.search).get("cwd") ?? "";
+
+interface EpicGroup {
+  id: string;
+  title: string;
+  description: string;
+  epic?: KanbanCard | undefined;
+  cards: KanbanCard[];
+}
 
 export function App() {
   const [cards, setCards] = useState<KanbanCard[]>([]);
@@ -47,19 +55,28 @@ export function App() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState("");
-  const [sessionCwd, setSessionCwd] = useState("");
+  const [sessionCwd, setSessionCwd] = useState(initialCwd);
   const [sessionBranch, setSessionBranch] = useState("");
 
-  const selected = useMemo(() => cards.find((card) => card.id === selectedId) ?? cards[0] ?? null, [cards, selectedId]);
+  const epicOptions = useMemo(() => cards.filter((card) => card.kind === "epic").sort(compareByUpdated), [cards]);
+  const epicLookup = useMemo(() => new Map(epicOptions.map((epic) => [epic.id, epic])), [epicOptions]);
+
   const visibleCards = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     return cards.filter((card) => {
       if (hideDone && card.status === "done") return false;
       if (!normalized) return true;
-      const haystack = [card.id, card.title, card.description, card.project, card.cwd, card.branch ?? "", card.nextAction, card.tags.join(" ")].join(" ").toLowerCase();
+      const epicTitle = card.epicId ? epicLookup.get(card.epicId)?.title ?? "" : "";
+      const haystack = [card.id, card.title, card.description, card.kind, epicTitle, card.project, card.cwd, card.branch ?? "", card.nextAction, card.tags.join(" ")]
+        .join(" ")
+        .toLowerCase();
       return haystack.includes(normalized);
     });
-  }, [cards, hideDone, query]);
+  }, [cards, epicLookup, hideDone, query]);
+
+  const selected = useMemo(() => cards.find((card) => card.id === selectedId) ?? visibleCards[0] ?? cards[0] ?? null, [cards, selectedId, visibleCards]);
+  const selectedChildren = useMemo(() => (selected?.kind === "epic" ? cards.filter((card) => card.epicId === selected.id) : []), [cards, selected]);
+  const boardGroups = useMemo(() => buildEpicGroups(cards, visibleCards), [cards, visibleCards]);
 
   useEffect(() => {
     void refresh();
@@ -74,7 +91,10 @@ export function App() {
       setMetrics(response.metrics);
       const defaultCwd = response.board.cards[0]?.cwd ?? "";
       setSessionCwd((current) => current || defaultCwd);
-      setSelectedId((current) => current ?? response.board.cards[0]?.id ?? null);
+      setSelectedId((current) => {
+        if (current && response.board.cards.some((card) => card.id === current)) return current;
+        return response.board.cards[0]?.id ?? null;
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load board.");
     } finally {
@@ -97,8 +117,8 @@ export function App() {
 
   async function handleDrop(status: CardStatus) {
     if (!draggedId) return;
-      const card = cards.find((item) => item.id === draggedId);
-      await run(() => moveCard(draggedId, status, `Moved to ${status} from the board.`, card?.cwd));
+    const card = cards.find((item) => item.id === draggedId);
+    await run(() => moveCard(draggedId, status, `Moved to ${status} from the board.`, card?.cwd));
     setDraggedId(null);
   }
 
@@ -125,15 +145,15 @@ export function App() {
           </div>
           <div>
             <h1>Agent Kanban</h1>
-            <p>Local development board</p>
+            <p>Epic swimlanes for agent work</p>
           </div>
         </div>
 
         <section className="metric-grid" aria-label="Board metrics">
-          <Metric label="Active" value={metrics?.active ?? 0} />
+          <Metric label="Epics" value={metrics?.epics ?? 0} />
+          <Metric label="Tasks" value={metrics?.tasks ?? 0} />
           <Metric label="Blocked" value={metrics?.blocked ?? 0} tone="danger" />
           <Metric label="Review" value={metrics?.review ?? 0} tone="amber" />
-          <Metric label="Done" value={metrics?.done ?? 0} tone="green" />
         </section>
 
         <form className="session-panel" onSubmit={handleStartSession}>
@@ -142,7 +162,7 @@ export function App() {
             <span>Session</span>
           </div>
           <label>
-            <span>CWD</span>
+            <span>Project path</span>
             <input value={sessionCwd} onChange={(event) => setSessionCwd(event.target.value)} placeholder="/project/path" required />
           </label>
           <label>
@@ -154,69 +174,61 @@ export function App() {
             <input value={sessionId} onChange={(event) => setSessionId(event.target.value)} placeholder="auto" />
           </label>
           <button type="submit" className="primary-action" disabled={busy}>
-            <Sparkles size={16} />
-            Start
+            <CheckCircle2 size={16} />
+            Start session
           </button>
         </form>
 
-        <CreateCardForm onCreate={(input) => run(() => createCard(input))} defaultCwd={sessionCwd} />
+        <CreateCardForm onCreate={(input) => run(() => createCard(input))} defaultCwd={sessionCwd} epics={epicOptions} />
       </aside>
 
       <section className="workspace">
         <header className="topbar">
           <div className="search-box">
             <Search size={17} />
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search cards, files, tags" />
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search epics, cards, files, tags" />
           </div>
           <button type="button" className={hideDone ? "toggle active" : "toggle"} onClick={() => setHideDone((value) => !value)}>
             <ListFilter size={16} />
             Active only
           </button>
-          <button type="button" className="icon-button" onClick={() => void refresh()} disabled={busy} aria-label="Refresh board" title="Refresh board">
+          <button type="button" className="secondary-action" onClick={() => void refresh()} disabled={busy}>
             {busy ? <Loader2 size={17} className="spin" /> : <RefreshCw size={17} />}
+            Refresh
           </button>
         </header>
 
         {error ? <div className="error-strip">{error}</div> : null}
 
-        <div className="board" aria-label="Kanban board">
-          {COLUMN_DEFINITIONS.map((column) => {
-            const columnCards = visibleCards.filter((card) => card.status === column.id);
-            return (
-              <section
-                key={column.id}
-                className={`column column-${column.id}`}
-                onDragOver={(event) => event.preventDefault()}
-                onDrop={() => void handleDrop(column.id)}
-              >
-                <header className="column-header">
-                  <div>
-                    <h2>{column.label}</h2>
-                    <p>{column.intent}</p>
-                  </div>
-                  <span>{columnCards.length}</span>
-                </header>
-                <div className="card-stack">
-                  {columnCards.map((card) => (
-                    <KanbanCardView
-                      key={card.id}
-                      card={card}
-                      selected={card.id === selected?.id}
-                      onSelect={() => setSelectedId(card.id)}
-                      onDragStart={() => setDraggedId(card.id)}
-                      onClaim={() => run(() => claimCard(card.id, sessionId || `web_${Date.now()}`, card.cwd, card.branch))}
-                      onNext={() => run(() => moveCard(card.id, nextStatus(card.status), `Advanced to ${nextStatus(card.status)}.`, card.cwd))}
-                    />
-                  ))}
-                </div>
-              </section>
-            );
-          })}
+        <div className="board" aria-label="Kanban board grouped by epic">
+          {boardGroups.length > 0 ? (
+            boardGroups.map((group) => (
+              <EpicSwimlane
+                key={group.id}
+                group={group}
+                selectedId={selected?.id ?? null}
+                draggedId={draggedId}
+                onDrop={handleDrop}
+                onSelect={setSelectedId}
+                onDragStart={setDraggedId}
+                onClaim={(card) => run(() => claimCard(card.id, sessionId || `web_${Date.now()}`, card.cwd, card.branch))}
+                onNext={(card) => run(() => moveCard(card.id, nextStatus(card.status), `Advanced to ${nextStatus(card.status)}.`, card.cwd))}
+              />
+            ))
+          ) : (
+            <div className="empty-board">
+              <Layers3 size={28} />
+              <strong>No cards yet</strong>
+              <span>Create an epic first, then add Ready tasks under it.</span>
+            </div>
+          )}
         </div>
       </section>
 
       <CardDetailPanel
         card={selected}
+        children={selectedChildren}
+        epic={selected?.epicId ? epicLookup.get(selected.epicId) : undefined}
         onMove={(status) => selected && run(() => moveCard(selected.id, status, `Moved to ${status} from detail panel.`, selected.cwd))}
         onBlock={(reason, nextAction) => selected && run(() => blockCard(selected.id, reason, nextAction, selected.cwd))}
         onComplete={(summary) => selected && run(() => completeCard(selected.id, summary, selected.cwd))}
@@ -226,7 +238,7 @@ export function App() {
   );
 }
 
-function Metric({ label, value, tone = "default" }: { label: string; value: number; tone?: "default" | "danger" | "amber" | "green" }) {
+function Metric({ label, value, tone = "default" }: { label: string; value: number; tone?: "default" | "danger" | "amber" }) {
   return (
     <div className={`metric metric-${tone}`}>
       <strong>{value}</strong>
@@ -235,10 +247,13 @@ function Metric({ label, value, tone = "default" }: { label: string; value: numb
   );
 }
 
-function CreateCardForm({ onCreate, defaultCwd }: { onCreate: (input: { title: string; priority: Priority; status: CardStatus; cwd?: string; tags: string[]; nextAction?: string }) => void; defaultCwd: string }) {
+function CreateCardForm({ onCreate, defaultCwd, epics }: { onCreate: (input: CreateCardInput) => void; defaultCwd: string; epics: KanbanCard[] }) {
   const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [kind, setKind] = useState<CardKind>("task");
+  const [epicId, setEpicId] = useState("");
   const [priority, setPriority] = useState<Priority>("medium");
-  const [status, setStatus] = useState<CardStatus>("backlog");
+  const [status, setStatus] = useState<CardStatus>("ready");
   const [tags, setTags] = useState("");
   const [nextAction, setNextAction] = useState("");
 
@@ -246,26 +261,55 @@ function CreateCardForm({ onCreate, defaultCwd }: { onCreate: (input: { title: s
     event.preventDefault();
     onCreate({
       title,
+      kind,
       priority,
       status,
       ...(defaultCwd ? { cwd: defaultCwd } : {}),
+      ...(description.trim() ? { description: description.trim() } : {}),
+      ...(kind === "task" && epicId ? { epicId } : {}),
       tags: tags.split(",").map((tag) => tag.trim()).filter(Boolean),
       ...(nextAction.trim() ? { nextAction: nextAction.trim() } : {})
     });
     setTitle("");
+    setDescription("");
     setTags("");
     setNextAction("");
+    if (kind === "task") setStatus("ready");
   }
 
   return (
     <form className="create-panel" onSubmit={submit}>
       <div className="section-title">
         <Plus size={16} />
-        <span>New card</span>
+        <span>New work item</span>
       </div>
       <label>
+        <span>Type</span>
+        <select value={kind} onChange={(event) => setKind(event.target.value as CardKind)}>
+          <option value="task">Task</option>
+          <option value="epic">Epic</option>
+        </select>
+      </label>
+      <label>
         <span>Title</span>
-        <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Work item" required />
+        <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={kind === "epic" ? "Epic name" : "Task title"} required />
+      </label>
+      {kind === "task" ? (
+        <label>
+          <span>Epic</span>
+          <select value={epicId} onChange={(event) => setEpicId(event.target.value)}>
+            <option value="">No Epic</option>
+            {epics.map((epic) => (
+              <option key={epic.id} value={epic.id}>
+                {epic.id} · {epic.title}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
+      <label>
+        <span>Description Markdown</span>
+        <textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="- acceptance criteria&#10;- notes" rows={4} />
       </label>
       <div className="field-row">
         <label>
@@ -295,13 +339,86 @@ function CreateCardForm({ onCreate, defaultCwd }: { onCreate: (input: { title: s
       </label>
       <label>
         <span>Next action</span>
-        <textarea value={nextAction} onChange={(event) => setNextAction(event.target.value)} rows={3} />
+        <textarea value={nextAction} onChange={(event) => setNextAction(event.target.value)} rows={2} />
       </label>
       <button type="submit" className="primary-action">
         <MessageSquarePlus size={16} />
-        Add card
+        Add {kind}
       </button>
     </form>
+  );
+}
+
+function EpicSwimlane({
+  group,
+  selectedId,
+  onDrop,
+  onSelect,
+  onDragStart,
+  onClaim,
+  onNext
+}: {
+  group: EpicGroup;
+  selectedId: string | null;
+  draggedId: string | null;
+  onDrop: (status: CardStatus) => Promise<void>;
+  onSelect: (id: string) => void;
+  onDragStart: (id: string) => void;
+  onClaim: (card: KanbanCard) => void;
+  onNext: (card: KanbanCard) => void;
+}) {
+  const done = group.cards.filter((card) => card.status === "done").length;
+  const total = group.cards.length;
+
+  return (
+    <section className="epic-lane">
+      <button type="button" className="epic-heading" onClick={() => group.epic && onSelect(group.epic.id)}>
+        <div>
+          <span className="eyebrow">{group.epic ? `${group.epic.id} · Epic` : "No Epic"}</span>
+          <h2>{group.title}</h2>
+          <p>{group.description}</p>
+        </div>
+        <div className="epic-progress" aria-label={`${done} of ${total} done`}>
+          <strong>{done}/{total}</strong>
+          <span>done</span>
+        </div>
+      </button>
+
+      <div className="swimlane-grid">
+        {COLUMN_DEFINITIONS.map((column) => {
+          const columnCards = group.cards.filter((card) => card.status === column.id);
+          return (
+            <section
+              key={column.id}
+              className={`column column-${column.id}`}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={() => void onDrop(column.id)}
+            >
+              <header className="column-header">
+                <div>
+                  <h3>{column.label}</h3>
+                  <p>{column.intent}</p>
+                </div>
+                <span>{columnCards.length}</span>
+              </header>
+              <div className="card-stack">
+                {columnCards.map((card) => (
+                  <KanbanCardView
+                    key={card.id}
+                    card={card}
+                    selected={card.id === selectedId}
+                    onSelect={() => onSelect(card.id)}
+                    onDragStart={() => onDragStart(card.id)}
+                    onClaim={() => onClaim(card)}
+                    onNext={() => onNext(card)}
+                  />
+                ))}
+              </div>
+            </section>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -322,13 +439,13 @@ function KanbanCardView({
 }) {
   const latestTest = card.tests.at(-1);
   const openBlockers = card.blockers.filter((blocker) => !blocker.resolvedAt).length;
+  const next = nextStatus(card.status);
 
   return (
     <article className={selected ? "work-card selected" : "work-card"} draggable onDragStart={onDragStart} onClick={onSelect}>
       <div className="card-topline">
         <span className="card-id">{card.id}</span>
         <PriorityPill priority={card.priority} />
-        <GripVertical size={15} className="drag-handle" />
       </div>
       <h3>{card.title}</h3>
       {card.nextAction ? <p className="next-action">{card.nextAction}</p> : null}
@@ -343,15 +460,19 @@ function KanbanCardView({
         <Meta icon={<FileCode2 size={14} />} text={`${card.filesTouched.length} files`} />
         <Meta icon={<Activity size={14} />} text={`${card.activity.length} logs`} />
       </div>
-      <div className="card-footer">
+      <div className="card-state-row">
         <span className={latestTest ? `test-chip test-${latestTest.status}` : "test-chip"}>{latestTest ? latestTest.status : "no tests"}</span>
         {openBlockers > 0 ? <span className="blocker-chip">{openBlockers} blocked</span> : null}
-        <button type="button" onClick={(event) => { event.stopPropagation(); onClaim(); }} title="Claim card" aria-label="Claim card">
-          <Check size={14} />
+      </div>
+      <div className="card-actions">
+        <button type="button" onClick={(event) => { event.stopPropagation(); onClaim(); }}>
+          <CheckCircle2 size={14} />
+          Claim
         </button>
         {card.status !== "done" ? (
-          <button type="button" onClick={(event) => { event.stopPropagation(); onNext(); }} title="Move next" aria-label="Move next">
-            <ArrowRight size={14} />
+          <button type="button" onClick={(event) => { event.stopPropagation(); onNext(); }}>
+            <MoveRight size={14} />
+            Move to {columnLabel(next)}
           </button>
         ) : null}
       </div>
@@ -361,12 +482,16 @@ function KanbanCardView({
 
 function CardDetailPanel({
   card,
+  children,
+  epic,
   onMove,
   onBlock,
   onComplete,
   onProgress
 }: {
   card: KanbanCard | null;
+  children: KanbanCard[];
+  epic?: KanbanCard | undefined;
   onMove: (status: CardStatus) => void;
   onBlock: (reason: string, nextAction: string) => void;
   onComplete: (summary: string) => void;
@@ -428,19 +553,51 @@ function CardDetailPanel({
   return (
     <aside className="detail-panel">
       <div className="detail-heading">
-        <span>{card.id}</span>
+        <div>
+          <span>{card.id}</span>
+          <KindPill kind={card.kind} />
+        </div>
         <PriorityPill priority={card.priority} />
       </div>
       <h2>{card.title}</h2>
-      <p className="description">{card.description || "No description"}</p>
 
-      <div className="status-actions">
-        {COLUMN_DEFINITIONS.map((column) => (
-          <button key={column.id} type="button" className={card.status === column.id ? "active" : ""} onClick={() => onMove(column.id)}>
-            {column.shortLabel}
-          </button>
-        ))}
-      </div>
+      {card.kind === "task" && epic ? (
+        <div className="parent-epic">
+          <Layers3 size={15} />
+          <span>{epic.id}</span>
+          <strong>{epic.title}</strong>
+        </div>
+      ) : null}
+
+      <section className="detail-section">
+        <h3>Description</h3>
+        <MarkdownView source={card.description} empty="No description" />
+      </section>
+
+      {card.kind === "epic" ? (
+        <section className="detail-section">
+          <h3>Epic progress</h3>
+          <div className="child-status-grid">
+            {COLUMN_DEFINITIONS.map((column) => (
+              <div key={column.id}>
+                <strong>{children.filter((child) => child.status === column.id).length}</strong>
+                <span>{column.shortLabel}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      <section className="detail-section">
+        <h3>Move status</h3>
+        <div className="status-actions">
+          {COLUMN_DEFINITIONS.map((column) => (
+            <button key={column.id} type="button" className={card.status === column.id ? "active" : ""} onClick={() => onMove(column.id)}>
+              {card.status === column.id ? "Currently" : "Move to"} {column.shortLabel}
+            </button>
+          ))}
+        </div>
+      </section>
 
       <section className="detail-section">
         <h3>Work state</h3>
@@ -454,15 +611,15 @@ function CardDetailPanel({
             <dd>{card.cwd}</dd>
           </div>
           <div>
-            <dt>Next</dt>
+            <dt>Next action</dt>
             <dd>{card.nextAction || "None"}</dd>
           </div>
         </dl>
       </section>
 
       <form className="progress-form" onSubmit={submitProgress}>
-        <h3>Progress</h3>
-        <textarea value={message} onChange={(event) => setMessage(event.target.value)} placeholder="Progress note" rows={3} required />
+        <h3>Record progress</h3>
+        <textarea value={message} onChange={(event) => setMessage(event.target.value)} placeholder="Progress note, Markdown allowed" rows={3} required />
         <input value={files} onChange={(event) => setFiles(event.target.value)} placeholder="files, comma-separated" />
         <textarea value={nextAction} onChange={(event) => setNextAction(event.target.value)} placeholder="Next action" rows={2} />
         <div className="field-row">
@@ -491,7 +648,7 @@ function CardDetailPanel({
           <input value={blockReason} onChange={(event) => setBlockReason(event.target.value)} placeholder="Blocker reason" required />
           <button type="submit">
             <Ban size={15} />
-            Block
+            Mark blocked
           </button>
         </form>
         <form
@@ -504,7 +661,7 @@ function CardDetailPanel({
           <input value={completeSummary} onChange={(event) => setCompleteSummary(event.target.value)} placeholder="Completion summary" required />
           <button type="submit">
             <BadgeCheck size={15} />
-            Done
+            Mark done
           </button>
         </form>
       </div>
@@ -521,11 +678,146 @@ function CardDetailPanel({
   );
 }
 
+function MarkdownView({ source, empty }: { source: string; empty?: string }) {
+  const blocks = parseMarkdown(source);
+  if (blocks.length === 0) return <p className="muted-text">{empty ?? "Empty"}</p>;
+  return (
+    <div className="markdown-view">
+      {blocks.map((block, index) => {
+        if (block.type === "heading") return <h4 key={index}>{renderInline(block.text)}</h4>;
+        if (block.type === "code") return <pre key={index}><code>{block.text}</code></pre>;
+        if (block.type === "ul") {
+          return (
+            <ul key={index}>
+              {block.items.map((item, itemIndex) => (
+                <li key={itemIndex}>
+                  {item.checked !== undefined ? <input type="checkbox" checked={item.checked} readOnly /> : null}
+                  <span>{renderInline(item.text)}</span>
+                </li>
+              ))}
+            </ul>
+          );
+        }
+        if (block.type === "ol") {
+          return (
+            <ol key={index}>
+              {block.items.map((item, itemIndex) => (
+                <li key={itemIndex}>{renderInline(item.text)}</li>
+              ))}
+            </ol>
+          );
+        }
+        return <p key={index}>{renderInline(block.text)}</p>;
+      })}
+    </div>
+  );
+}
+
+type MarkdownBlock =
+  | { type: "heading" | "paragraph" | "code"; text: string }
+  | { type: "ul"; items: { text: string; checked?: boolean | undefined }[] }
+  | { type: "ol"; items: { text: string }[] };
+
+function parseMarkdown(source: string): MarkdownBlock[] {
+  const lines = source.replace(/\\n/g, "\n").trim().split(/\r?\n/);
+  const blocks: MarkdownBlock[] = [];
+  let paragraph: string[] = [];
+  let code: string[] | null = null;
+
+  function flushParagraph() {
+    if (paragraph.length) {
+      blocks.push({ type: "paragraph", text: paragraph.join(" ") });
+      paragraph = [];
+    }
+  }
+
+  for (const line of lines) {
+    if (line.trim().startsWith("```")) {
+      if (code) {
+        blocks.push({ type: "code", text: code.join("\n") });
+        code = null;
+      } else {
+        flushParagraph();
+        code = [];
+      }
+      continue;
+    }
+    if (code) {
+      code.push(line);
+      continue;
+    }
+    if (!line.trim()) {
+      flushParagraph();
+      continue;
+    }
+    const heading = /^(#{1,4})\s+(.+)$/.exec(line);
+    if (heading) {
+      flushParagraph();
+      blocks.push({ type: "heading", text: heading[2] ?? "" });
+      continue;
+    }
+    const unordered = /^[-*]\s+(\[[ xX]\]\s+)?(.+)$/.exec(line);
+    if (unordered) {
+      flushParagraph();
+      const last = blocks.at(-1);
+      const marker = unordered[1];
+      const item = { text: unordered[2] ?? "", ...(marker ? { checked: marker.toLowerCase().includes("x") } : {}) };
+      if (last?.type === "ul") last.items.push(item);
+      else blocks.push({ type: "ul", items: [item] });
+      continue;
+    }
+    const ordered = /^\d+\.\s+(.+)$/.exec(line);
+    if (ordered) {
+      flushParagraph();
+      const last = blocks.at(-1);
+      const item = { text: ordered[1] ?? "" };
+      if (last?.type === "ol") last.items.push(item);
+      else blocks.push({ type: "ol", items: [item] });
+      continue;
+    }
+    paragraph.push(line.trim());
+  }
+  flushParagraph();
+  if (code) blocks.push({ type: "code", text: code.join("\n") });
+  return blocks;
+}
+
+function renderInline(text: string): ReactNode[] {
+  const pattern = /(`[^`]+`|\*\*[^*]+\*\*|\[[^\]]+\]\([^)]+\))/g;
+  const nodes: ReactNode[] = [];
+  let cursor = 0;
+  for (const match of text.matchAll(pattern)) {
+    const start = match.index ?? 0;
+    if (start > cursor) nodes.push(text.slice(cursor, start));
+    const token = match[0];
+    if (token.startsWith("`")) {
+      nodes.push(<code key={`${start}-code`}>{token.slice(1, -1)}</code>);
+    } else if (token.startsWith("**")) {
+      nodes.push(<strong key={`${start}-strong`}>{token.slice(2, -2)}</strong>);
+    } else {
+      const link = /^\[([^\]]+)\]\(([^)]+)\)$/.exec(token);
+      const href = link?.[2] ?? "";
+      if (/^https?:\/\//.test(href)) {
+        nodes.push(
+          <a key={`${start}-link`} href={href} target="_blank" rel="noreferrer">
+            {link?.[1] ?? href}
+          </a>
+        );
+      } else {
+        nodes.push(link?.[1] ?? token);
+      }
+    }
+    cursor = start + token.length;
+  }
+  if (cursor < text.length) nodes.push(text.slice(cursor));
+  return nodes;
+}
+
 function ActivityItem({ entry }: { entry: ActivityEntry }) {
   return (
     <li>
       <span>{entry.type.replace("_", " ")}</span>
-      <p>{entry.message}</p>
+      <MarkdownView source={entry.message} />
       <time>{new Date(entry.at).toLocaleString()}</time>
     </li>
   );
@@ -535,7 +827,11 @@ function PriorityPill({ priority }: { priority: Priority }) {
   return <span className={`priority priority-${priority}`}>{priority}</span>;
 }
 
-function Meta({ icon, text }: { icon: React.ReactNode; text: string }) {
+function KindPill({ kind }: { kind: CardKind }) {
+  return <span className={`kind-pill kind-${kind}`}>{kind}</span>;
+}
+
+function Meta({ icon, text }: { icon: ReactNode; text: string }) {
   return (
     <span className="meta-item">
       {icon}
@@ -544,7 +840,42 @@ function Meta({ icon, text }: { icon: React.ReactNode; text: string }) {
   );
 }
 
+function buildEpicGroups(cards: KanbanCard[], visibleCards: KanbanCard[]): EpicGroup[] {
+  const visibleIds = new Set(visibleCards.map((card) => card.id));
+  const epics = cards.filter((card) => card.kind === "epic").sort(compareByUpdated);
+  const tasks = visibleCards.filter((card) => card.kind !== "epic");
+  const matchingEpicIds = new Set(tasks.map((card) => card.epicId).filter(Boolean) as string[]);
+  const groups: EpicGroup[] = epics
+    .filter((epic) => visibleIds.has(epic.id) || matchingEpicIds.has(epic.id))
+    .map((epic) => ({
+      id: epic.id,
+      title: epic.title,
+      description: epic.nextAction || epic.description || "No epic summary",
+      epic,
+      cards: tasks.filter((card) => card.epicId === epic.id).sort(compareByUpdated)
+    }));
+
+  const unassigned = tasks.filter((card) => !card.epicId || !epics.some((epic) => epic.id === card.epicId)).sort(compareByUpdated);
+  if (unassigned.length > 0 || groups.length === 0) {
+    groups.push({
+      id: "no-epic",
+      title: "No Epic",
+      description: "Tasks that are not grouped under an epic yet.",
+      cards: unassigned
+    });
+  }
+  return groups;
+}
+
+function compareByUpdated(a: KanbanCard, b: KanbanCard): number {
+  return Date.parse(b.updatedAt) - Date.parse(a.updatedAt);
+}
+
 function nextStatus(status: CardStatus): CardStatus {
   const index = statusOrder.indexOf(status);
   return statusOrder[Math.min(index + 1, statusOrder.length - 1)] ?? "done";
+}
+
+function columnLabel(status: CardStatus): string {
+  return COLUMN_DEFINITIONS.find((column) => column.id === status)?.shortLabel ?? status;
 }

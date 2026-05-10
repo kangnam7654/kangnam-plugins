@@ -52,6 +52,8 @@ app.get("/api/cards", asyncHandler(async (req) => {
   const store = storeForReq(req);
   const filters: CardFilters = {
     status: asString(req.query.status) as CardFilters["status"],
+    kind: asString(req.query.kind) as CardFilters["kind"],
+    epicId: asString(req.query.epicId),
     project: asString(req.query.project),
     cwd: asString(req.query.cwd),
     branch: asString(req.query.branch),

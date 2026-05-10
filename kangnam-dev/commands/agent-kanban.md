@@ -24,8 +24,9 @@ CLI를 우선 사용한다:
 새 작업을 시작해야 하면:
 
 ```bash
-<plugin-root>/scripts/agent-kanban/agent-kanban.sh create "작업 제목" --cwd "$PWD" --status ready --priority medium --next "다음 행동"
-<plugin-root>/scripts/agent-kanban/agent-kanban.sh claim KBN-1001 --cwd "$PWD" --session "<stable-session-id>"
+<plugin-root>/scripts/agent-kanban/agent-kanban.sh create "큰 작업 묶음" --cwd "$PWD" --type epic --status ready --priority medium --next "작은 작업으로 쪼개기"
+<plugin-root>/scripts/agent-kanban/agent-kanban.sh create "구체 작업 제목" --cwd "$PWD" --type task --epic KBN-1001 --status ready --priority medium --next "다음 행동"
+<plugin-root>/scripts/agent-kanban/agent-kanban.sh claim KBN-1002 --cwd "$PWD" --session "<stable-session-id>"
 ```
 
 진행 기록:
@@ -51,6 +52,16 @@ npm run dev
 ```
 
 브라우저에서 `http://127.0.0.1:3001`을 연다.
+
+UI 구조:
+
+```txt
+Epic
+  Backlog | Ready | In Progress | Review | Blocked | Done
+    Task cards
+```
+
+설명과 진행 기록은 Markdown으로 렌더링된다. 버튼은 `Claim`, `Move to Review`, `Mark blocked`, `Mark done`처럼 실제 동작이 드러나게 표시된다.
 
 ## MCP
 

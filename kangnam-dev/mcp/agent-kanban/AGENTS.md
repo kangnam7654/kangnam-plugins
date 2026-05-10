@@ -22,7 +22,7 @@ At session start:
 - The board state is project-local: commands write to `<project-root>/.kanban/kanban-data.json` based on `cwd`.
 - Continue an active card when one is printed.
 - If no active card exists, claim the highest-priority ready card before editing files.
-- If no ready card exists, create a card before starting new implementation work.
+- If no ready card exists, create a task before starting new implementation work. If the work is broad, create an epic first and put concrete tasks under it.
 
 During work:
 - Run `agent-kanban claim <card-id> --cwd <current-project-dir> --session <stable-id>` before file changes for a card.
@@ -33,6 +33,11 @@ During work:
 At finish:
 - Run `agent-kanban done ...` only after verification.
 - Run `agent-kanban end ...` with a concise handoff summary before ending the turn.
+
+Epic model:
+- Broad work uses `agent-kanban create "..." --type epic`.
+- Concrete work uses `agent-kanban create "..." --type task --epic <epic-id>`.
+- The UI renders each epic as a swimlane with Backlog, Ready, In Progress, Review, Blocked, and Done below it.
 
 MCP fallback:
 - `kanban_context` maps to `agent-kanban context`.

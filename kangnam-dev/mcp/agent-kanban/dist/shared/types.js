@@ -7,5 +7,6 @@ export const COLUMN_DEFINITIONS = [
     { id: "done", label: "Done", shortLabel: "Done", intent: "Verified and complete" }
 ];
 export const PRIORITIES = ["urgent", "high", "medium", "low"];
+export const CARD_KINDS = ["epic", "task"];
 export const TEST_STATUSES = ["passed", "failed", "skipped"];
 export const SESSION_OUTCOMES = ["continued", "blocked", "completed", "abandoned"];

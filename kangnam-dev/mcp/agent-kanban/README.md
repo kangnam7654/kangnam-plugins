@@ -10,6 +10,8 @@ The durable state lives inside each project at `.kanban/kanban-data.json`. The C
 ## What is included
 
 - React board UI with columns, filters, drag/drop moves, card details, progress logs, blockers, files, and test evidence
+- Epic swimlanes: each epic owns the six workflow columns for its child tasks
+- Markdown rendering for card descriptions and progress/activity notes
 - Local REST API for the UI
 - Token-efficient `agent-kanban` CLI for LLM sessions
 - Thin stdio MCP adapter for clients that cannot run the CLI directly
@@ -50,7 +52,8 @@ Use the CLI first when the agent can run shell commands. It keeps the context sm
 
 ```sh
 agent-kanban context --cwd /Users/kangnam/projects/example-app
-agent-kanban create "Add settings validation" --cwd /Users/kangnam/projects/example-app --status ready --priority high --next "Write failing validation test"
+agent-kanban create "Settings UX cleanup" --cwd /Users/kangnam/projects/example-app --type epic --status ready --priority high --next "Break down validation tasks"
+agent-kanban create "Add settings validation" --cwd /Users/kangnam/projects/example-app --type task --epic KBN-1001 --status ready --priority high --next "Write failing validation test"
 agent-kanban claim AK-1 --cwd /Users/kangnam/projects/example-app --session codex-20260510
 agent-kanban progress AK-1 --cwd /Users/kangnam/projects/example-app --msg "Added validator and unit test" --files src/settings.ts,tests/settings.test.ts --test-command "npm test" --test-status passed --test-summary "Settings tests passed"
 agent-kanban done AK-1 --cwd /Users/kangnam/projects/example-app --summary "Settings validation is implemented and verified"
@@ -128,3 +131,20 @@ KANBAN_DATA_PATH=/absolute/path/to/kanban-data.json npm run dev
 ```
 
 Normal LLM usage should pass the current project `cwd` to MCP tools and avoid setting `KANBAN_DATA_PATH`.
+
+## Board model
+
+The web UI follows a Jira-like hierarchy:
+
+```txt
+Epic
+  Backlog | Ready | In Progress | Review | Blocked | Done
+    Task cards
+```
+
+Cards can be either:
+
+- `epic`: a parent lane with its own summary, status, and progress counters
+- `task`: an actionable work item that can be linked to an epic with `--epic <epic-id>`
+
+Tasks without an epic appear in the `No Epic` lane until they are grouped.

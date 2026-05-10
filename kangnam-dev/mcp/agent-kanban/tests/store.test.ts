@@ -92,4 +92,29 @@ describe("KanbanStore", () => {
       await rm(dir, { recursive: true, force: true });
     }
   });
+
+  it("links tasks under epics", async () => {
+    const { store, dir } = await testStore();
+    try {
+      const epic = await store.createCard({
+        title: "Improve browser board UX",
+        kind: "epic",
+        status: "ready",
+        description: "Group work into epic swimlanes."
+      });
+      const task = await store.createCard({
+        title: "Render markdown descriptions",
+        kind: "task",
+        epicId: epic.id,
+        status: "ready"
+      });
+      const board = await store.getBoard();
+      expect(board.cards.find((card) => card.id === epic.id)?.kind).toBe("epic");
+      expect(board.cards.find((card) => card.id === task.id)?.epicId).toBe(epic.id);
+      expect((await store.getMetrics()).epics).toBe(1);
+      expect((await store.listCards({ epicId: epic.id })).cards.map((card) => card.id)).toEqual([task.id]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
 });

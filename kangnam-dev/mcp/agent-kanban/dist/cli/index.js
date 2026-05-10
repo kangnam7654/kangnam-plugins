@@ -6,8 +6,8 @@ const HELP = `agent-kanban: project-local Kanban for LLM development sessions
 Usage:
   agent-kanban context --cwd <path> [--branch <name>] [--json]
   agent-kanban start --cwd <path> [--branch <name>] [--session <id>]
-  agent-kanban list --cwd <path> [--status ready] [--json]
-  agent-kanban create "Title" --cwd <path> [--priority high] [--status ready] [--tags api,ui] [--next "..."]
+  agent-kanban list --cwd <path> [--status ready] [--kind task] [--epic KBN-1001] [--json]
+  agent-kanban create "Title" --cwd <path> [--type task|epic] [--epic KBN-1001] [--priority high] [--status ready] [--tags api,ui] [--next "..."]
   agent-kanban claim <card-id> --cwd <path> --session <id>
   agent-kanban move <card-id> <status> --cwd <path>
   agent-kanban progress <card-id> --cwd <path> --msg "..." [--files a,b] [--next "..."] [--test-command "..."] [--test-status passed] [--test-summary "..."]
@@ -91,6 +91,8 @@ async function startCommand(store, flags, cwd, json) {
 async function listCommand(store, flags, json) {
     const filters = {
         status: stringFlag(flags, "status"),
+        kind: stringFlag(flags, "kind"),
+        epicId: stringFlag(flags, "epic") ?? stringFlag(flags, "epic-id"),
         branch: stringFlag(flags, "branch"),
         tag: stringFlag(flags, "tag"),
         query: stringFlag(flags, "query"),
@@ -111,6 +113,8 @@ async function createCommand(store, parsed, cwd, json) {
         branch: stringFlag(parsed.flags, "branch"),
         description: stringFlag(parsed.flags, "desc") ?? stringFlag(parsed.flags, "description"),
         status: stringFlag(parsed.flags, "status") ?? "backlog",
+        kind: (stringFlag(parsed.flags, "type") ?? stringFlag(parsed.flags, "kind")),
+        epicId: stringFlag(parsed.flags, "epic") ?? stringFlag(parsed.flags, "epic-id"),
         priority: stringFlag(parsed.flags, "priority") ?? "medium",
         tags: csvFlag(parsed.flags, "tags"),
         nextAction: stringFlag(parsed.flags, "next")
@@ -203,6 +207,8 @@ function compactPage(page) {
 function compactCard(card) {
     const parts = [
         card.id,
+        `type=${card.kind}`,
+        card.epicId ? `epic=${card.epicId}` : "",
         `status=${card.status}`,
         `priority=${card.priority}`,
         `title=${quote(card.title)}`,

@@ -22,12 +22,32 @@ Examples:
 ```
 
 ```json
-{ "args": ["claim", "AK-1", "--cwd", "/Users/kangnam/projects/example-app", "--session", "codex-20260510"] }
+{ "args": ["create", "Settings UX cleanup", "--cwd", "/Users/kangnam/projects/example-app", "--type", "epic", "--status", "ready"] }
 ```
 
 ```json
-{ "args": ["progress", "AK-1", "--cwd", "/Users/kangnam/projects/example-app", "--msg", "Added validation tests", "--files", "src/settings.ts,tests/settings.test.ts"] }
+{ "args": ["create", "Add settings validation", "--cwd", "/Users/kangnam/projects/example-app", "--type", "task", "--epic", "KBN-1001", "--status", "ready"] }
 ```
+
+```json
+{ "args": ["claim", "KBN-1002", "--cwd", "/Users/kangnam/projects/example-app", "--session", "codex-20260510"] }
+```
+
+```json
+{ "args": ["progress", "KBN-1002", "--cwd", "/Users/kangnam/projects/example-app", "--msg", "Added validation tests", "--files", "src/settings.ts,tests/settings.test.ts"] }
+```
+
+## Board hierarchy
+
+The UI groups work as epic swimlanes:
+
+```txt
+Epic
+  Backlog | Ready | In Progress | Review | Blocked | Done
+    Task cards
+```
+
+Use `--type epic` for broad outcomes and `--type task --epic <epic-id>` for implementation cards.
 
 ## Expected agent loop
 

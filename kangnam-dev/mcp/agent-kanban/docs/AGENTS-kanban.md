@@ -12,7 +12,7 @@ At session start:
 - The board is stored inside the current project at `<project-root>/.kanban/kanban-data.json`; do not use `~/wiki/Kanban` for agent session state.
 - If the returned context has an active card, continue that card.
 - If no active card exists, claim the highest-priority ready card before editing files.
-- If no ready card exists, create a card before starting new implementation work.
+- If no ready card exists, create a task before starting new implementation work. If the work is broad, create an epic first and put concrete tasks under it.
 
 During work:
 - Run `agent-kanban claim <card-id> --cwd <current-project-dir> --session <stable-id>` before making file changes for a card.
@@ -24,6 +24,12 @@ At finish:
 - Run `agent-kanban done ...` only after verification.
 - Run `agent-kanban end ...` with a concise outcome summary before ending the turn.
 - Do not silently work outside the board unless the user explicitly asks for work that should not be tracked.
+
+Epic model:
+- Use `--type epic` for broad work areas.
+- Use `--type task --epic <epic-id>` for concrete implementation cards.
+- The UI shows each epic as a swimlane with Backlog, Ready, In Progress, Review, Blocked, and Done columns underneath.
+- Tasks without an epic appear in `No Epic`; group them before a sprint if they belong to a larger outcome.
 
 MCP fallback:
 - `kanban_context` maps to `agent-kanban context`.

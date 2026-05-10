@@ -4,7 +4,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { createInitialData } from "./initialData.js";
 import { resolveProjectDataPath, resolveProjectRoot } from "./projectPaths.js";
-import { COLUMN_DEFINITIONS, PRIORITIES, SESSION_OUTCOMES, TEST_STATUSES } from "./types.js";
+import { CARD_KINDS, COLUMN_DEFINITIONS, PRIORITIES, SESSION_OUTCOMES, TEST_STATUSES } from "./types.js";
 import type {
   ActivityEntry,
   AgentSession,
@@ -12,6 +12,7 @@ import type {
   BlockCardInput,
   BoardContext,
   BoardMetrics,
+  CardKind,
   CardFilters,
   CardStatus,
   ClaimCardInput,
@@ -147,10 +148,23 @@ export class KanbanStore {
     validateNonEmpty(input.title, "title");
     return this.mutate((data) => {
       const now = new Date().toISOString();
+      const kind = input.kind ?? "task";
+      validateCardKind(kind);
+      const epicId = input.epicId?.trim();
+      if (kind === "epic" && epicId) {
+        throw new KanbanStoreError("Epic cards cannot be nested under another epic.");
+      }
+      if (kind === "task" && epicId) {
+        const epic = data.cards.find((item) => item.id === epicId);
+        if (!epic) throw new KanbanStoreError(`Epic ${epicId} was not found.`, 404);
+        if (epic.kind !== "epic") throw new KanbanStoreError(`${epicId} is not an epic card.`);
+      }
       const card: KanbanCard = {
         id: nextCardId(data.cards),
         title: input.title.trim(),
         description: input.description?.trim() ?? "",
+        kind,
+        ...(kind === "task" && epicId ? { epicId } : {}),
         status: input.status ?? "backlog",
         priority: input.priority ?? "medium",
         project: input.project?.trim() || data.settings.defaultProject,
@@ -310,7 +324,7 @@ function normalizeData(data: KanbanData): KanbanData {
       defaultProject: data.settings?.defaultProject || "default",
       columns: COLUMN_DEFINITIONS
     },
-    cards: Array.isArray(data.cards) ? data.cards : [],
+    cards: Array.isArray(data.cards) ? data.cards.map(normalizeCard) : [],
     sessions: Array.isArray(data.sessions) ? data.sessions : [],
     updatedAt: data.updatedAt || new Date().toISOString()
   };
@@ -321,13 +335,15 @@ function applyFilters(cards: KanbanCard[], filters: CardFilters): KanbanCard[] {
   return cards.filter((card) => {
     if (!filters.includeDone && card.status === "done") return false;
     if (filters.status && card.status !== filters.status) return false;
+    if (filters.kind && card.kind !== filters.kind) return false;
+    if (filters.epicId && card.epicId !== filters.epicId) return false;
     if (filters.project && card.project !== filters.project) return false;
     if (filters.cwd && card.cwd !== filters.cwd) return false;
     if (filters.branch && card.branch !== filters.branch) return false;
     if (filters.tag && !card.tags.includes(filters.tag)) return false;
     if (filters.assigneeKind && card.assignee.kind !== filters.assigneeKind) return false;
     if (query) {
-      const haystack = [card.id, card.title, card.description, card.nextAction, card.project, card.cwd, card.branch ?? "", card.tags.join(" ")].join(" ").toLowerCase();
+      const haystack = [card.id, card.title, card.description, card.kind, card.epicId ?? "", card.nextAction, card.project, card.cwd, card.branch ?? "", card.tags.join(" ")].join(" ").toLowerCase();
       if (!haystack.includes(query)) return false;
     }
     return true;
@@ -339,11 +355,27 @@ function computeMetrics(cards: KanbanCard[]): BoardMetrics {
   for (const card of cards) byStatus[card.status] += 1;
   return {
     total: cards.length,
+    epics: cards.filter((card) => card.kind === "epic").length,
+    tasks: cards.filter((card) => card.kind !== "epic").length,
     active: cards.filter((card) => card.status !== "done").length,
     blocked: byStatus.blocked,
     review: byStatus.review,
     done: byStatus.done,
     byStatus
+  };
+}
+
+function normalizeCard(card: KanbanCard): KanbanCard {
+  const kind = CARD_KINDS.includes(card.kind) ? card.kind : "task";
+  return {
+    ...card,
+    kind,
+    ...(kind === "task" && card.epicId?.trim() ? { epicId: card.epicId.trim() } : { epicId: undefined }),
+    tags: Array.isArray(card.tags) ? card.tags : [],
+    filesTouched: Array.isArray(card.filesTouched) ? card.filesTouched : [],
+    tests: Array.isArray(card.tests) ? card.tests : [],
+    blockers: Array.isArray(card.blockers) ? card.blockers : [],
+    activity: Array.isArray(card.activity) ? card.activity : []
   };
 }
 
@@ -434,6 +466,12 @@ function toTestResult(input: Omit<TestResult, "id" | "at">): TestResult {
 function validateStatus(status: CardStatus): void {
   if (!COLUMN_DEFINITIONS.some((column) => column.id === status)) {
     throw new KanbanStoreError(`Invalid status ${status}. Expected one of: ${COLUMN_DEFINITIONS.map((column) => column.id).join(", ")}.`);
+  }
+}
+
+function validateCardKind(kind: CardKind): void {
+  if (!CARD_KINDS.includes(kind)) {
+    throw new KanbanStoreError(`Invalid card kind ${kind}. Expected one of: ${CARD_KINDS.join(", ")}.`);
   }
 }
 

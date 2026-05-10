@@ -13,6 +13,18 @@ Agent Kanban is the project-local board for development sessions. It stores stat
 
 Use the CLI first. It is more token-efficient than MCP because command output is compact and the model does not need to carry many tool schemas. MCP is only a fallback for clients that cannot run shell commands.
 
+## Board Model
+
+The UI follows a Jira-like hierarchy:
+
+```txt
+Epic
+  Backlog | Ready | In Progress | Review | Blocked | Done
+    Task cards
+```
+
+Use epics for broad outcomes and tasks for concrete implementation work. Tasks without an epic appear in the `No Epic` swimlane until grouped.
+
 ## Locate the packaged CLI
 
 Resolve `<plugin-root>` as two directories above this skill directory:
@@ -33,11 +45,12 @@ At session start:
 
 If the output shows an active card, continue it. If it shows ready cards, claim the highest-priority ready card before editing files. If no ready card exists, create one before starting new implementation work.
 
-Create and claim:
+Create an epic, then concrete tasks under it:
 
 ```bash
-<plugin-root>/scripts/agent-kanban/agent-kanban.sh create "Implement settings validation" --cwd "$PWD" --status ready --priority high --next "Write failing validation test"
-<plugin-root>/scripts/agent-kanban/agent-kanban.sh claim KBN-1001 --cwd "$PWD" --session "<stable-session-id>"
+<plugin-root>/scripts/agent-kanban/agent-kanban.sh create "Settings UX cleanup" --cwd "$PWD" --type epic --status ready --priority high --next "Break down validation tasks"
+<plugin-root>/scripts/agent-kanban/agent-kanban.sh create "Implement settings validation" --cwd "$PWD" --type task --epic KBN-1001 --status ready --priority high --next "Write failing validation test"
+<plugin-root>/scripts/agent-kanban/agent-kanban.sh claim KBN-1002 --cwd "$PWD" --session "<stable-session-id>"
 ```
 
 Record progress after meaningful work:
@@ -69,6 +82,8 @@ npm run dev
 ```
 
 Open `http://127.0.0.1:3001`.
+
+The UI renders card descriptions and progress notes as Markdown. It also labels action buttons with their exact effect, such as `Claim`, `Move to Review`, `Mark blocked`, and `Mark done`.
 
 ## MCP Fallback
 
