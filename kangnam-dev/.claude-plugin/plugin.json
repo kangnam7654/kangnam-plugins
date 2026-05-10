@@ -1,5 +1,6 @@
 {
   "name": "kangnam-dev",
+  "version": "0.1.1",
   "description": "End-to-end service development pipeline: idea → design → implementation → continuous improvement loops.",
   "author": {
     "name": "kangnam7654"
