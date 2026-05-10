@@ -6,7 +6,7 @@ argument-hint: "<project> <version> [--parallel] [--gates G1,G2,...] [--working-
 Raw slash-command arguments:
 `$ARGUMENTS`
 
-# sprint-implement
+# /sprint-implement
 
 `<plugin-root>`는 이 plugin의 `kangnam-dev/` 디렉토리다. 체크아웃에서 실행하면 `/Users/kangnam/projects/kangnam-plugins/kangnam-dev`, 설치본에서 실행하면 설치된 plugin의 `kangnam-dev` 루트로 해석한다.
 
