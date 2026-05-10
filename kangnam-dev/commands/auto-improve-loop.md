@@ -7,7 +7,7 @@ disable-model-invocation: true
 Raw slash-command arguments:
 `$ARGUMENTS`
 
-**REQUIRED BACKGROUND:** 공통 loop 패턴은 `~/.claude/skills/_shared/loop-pattern.md` 참조. 이 스킬은 해당 패턴의 specialization이다.
+**REQUIRED BACKGROUND:** 공통 loop 패턴은 `kangnam-dev/skills/_shared/loop-pattern.md` 참조. 이 스킬은 해당 패턴의 specialization이다.
 <!-- Override: Ralph Loop pattern — max rounds configurable (default 5), exit conditions differ (score target + stagnation + regression detection); state persisted via improve-progress.yaml across sessions -->
 
 # auto-improve-loop

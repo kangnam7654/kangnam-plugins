@@ -1,5 +1,5 @@
 ---
-description: "스프린트 시작. 스크립트 스캐폴드 → kanban-curator로 보드 정리 → sprint-planner가 본문 채움 → critic이 점수 → PASS 시 Kanban epic 발행 + commit."
+description: "스프린트 시작. 기존 Kanban 카드 intake + 스캐폴드 → 보드 정리 → sprint-planner가 범위/gate/card 매핑 작성 → critic → PASS 시 카드 연결/발행 + commit."
 argument-hint: "<project> <version> [--scale micro|standard|major] [--no-auto-archive] [한 줄 목표]"
 disable-model-invocation: true
 ---
@@ -9,14 +9,16 @@ Raw slash-command arguments:
 
 # sprint-planning
 
+`<plugin-root>`는 이 plugin의 `kangnam-dev/` 디렉토리다. 체크아웃에서 실행하면 `/Users/kangnam/projects/kangnam-plugins/kangnam-dev`, 설치본에서 실행하면 설치된 plugin의 `kangnam-dev` 루트로 해석한다.
+
 새 스프린트의 시작점. 6단계 파이프라인:
 
-1. **스크립트** — 안전한 스캐폴드 (frontmatter, 섹션, carry-over 추출)
+1. **스크립트** — 안전한 스캐폴드 (frontmatter, 섹션, carry-over 추출, 기존 Kanban intake 카드 목록 삽입)
 2. **kanban-curator 에이전트** — 미배정/고아 카드 분석 후 사용자에게 알림 + 안전한 것은 자동 archive
 3. **sprint-planner 에이전트** — 본문 채움 (모호하면 사용자에게 묻고, fallback 금지)
 4. **critic 에이전트 (sprint-plan 모드)** — 5축 채점, PASS = total > 8.0 AND Gate Triple Integrity >= 8
 5. **REJECT 루프** — 피드백 들고 sprint-planner에게 다시. 최대 3 라운드. 그래도 REJECT면 사용자에게 보고.
-6. **PASS 시** — Kanban epic 발행 + commit (push X)
+6. **PASS 시** — Kanban epic 발행 + 기존 카드 sprint/gate 연결 + 새 gate 카드 발행 + commit (push X)
 
 ## Step 0 · 인자 검증
 
@@ -28,16 +30,17 @@ Raw slash-command arguments:
 
 ```bash
 git -C ~/wiki pull --rebase
-uv run ~/.claude/plugins/marketplaces/kangnam-plugins/kangnam-dev/scripts/sprint/sprint-planning.py $ARGUMENTS
+uv run <plugin-root>/scripts/sprint/sprint-planning.py $ARGUMENTS
 ```
 
 스크립트가 처리:
 - 프로젝트 폴더 존재 확인
 - 버전 SemVer 검증 + v-prefix 컨벤션 자동 적용
 - 직전 스프린트 review.md에서 Action Items carry-over 추출
+- 현재 프로젝트의 열린 Kanban 카드(Backlog/InProgress/Blocked)를 `Sprint Intake Cards` 섹션에 삽입
 - `Sprints/<version>/planning.md` 스캐폴드 (이미 있으면 거부 — `--force`로 덮어쓰기)
 - frontmatter에 `scale: <micro|standard|major>` 기록 (critic이 사용)
-- `git add` (커밋은 Step 5)
+- `git add` (커밋은 Step 6)
 
 스크립트 stdout에서 다음 정보 캡처:
 - 스캐폴드된 `planning.md` 절대 경로
@@ -46,7 +49,7 @@ uv run ~/.claude/plugins/marketplaces/kangnam-plugins/kangnam-dev/scripts/sprint
 
 ## Step 1.5 · kanban-curator 에이전트 호출 (보드 점검)
 
-새 스프린트 시작은 칸반 보드의 누적 카드를 정리하는 자연스러운 시점. 미배정 카드 + 옛 스프린트 고아 카드를 curator가 **내용 기반**으로 분류한다.
+새 스프린트 시작은 칸반 보드의 누적 카드를 정리하는 자연스러운 시점. 스크립트가 이미 현재 프로젝트의 열린 카드를 `Sprint Intake Cards`에 넣어두며, curator는 그 외 미배정 카드 + 옛 스프린트 고아 카드를 **내용 기반**으로 분류한다.
 
 ```
 Agent(
@@ -84,8 +87,8 @@ curator의 YAML 출력 파싱:
   - 's' 입력: 모두 그대로 둠 (skip)
 ```
 
-`a`: 각 notify 카드에 대해 `kanban-set.py <id> --sprint <current_sprint>` 일괄 실행.
-`i`: 각 카드마다 사용자에게 묻고 처리 (label / archive / skip).
+`a`: 각 notify 카드에 대해 `<plugin-root>/skills/kanban/scripts/kanban-set.py <id> --sprint <current_sprint>` 일괄 실행한 뒤 planning.md의 `Sprint Intake Cards`에 카드가 보이도록 planner에게 전달.
+`i`: 각 카드마다 사용자에게 묻고 처리 (label / archive / skip). label이면 current_sprint에 묶고 planner가 gate `card:`로 매핑하게 한다.
 `s`: 통과.
 
 ### `auto_archive_safe` 카드 (있으면)
@@ -97,7 +100,7 @@ curator가 이미 "안전" 판단했으므로 **자동 archive 후 사후 보고
   - [ID] 제목 — 이유: <reason>
   - ...
 
-각 카드에 대해 `kanban-rm.py <id>` 실행 (Archive 폴더로 이동, 영구 삭제 X).
+각 카드에 대해 `<plugin-root>/skills/kanban/scripts/kanban-rm.py <id>` 실행 (Archive 폴더로 이동, 영구 삭제 X).
 ```
 
 단, 사용자가 명령 호출 시 `--no-auto-archive` 인자를 줬다면 archive 대신 사용자 컨펌으로 전환.
@@ -132,6 +135,7 @@ Inputs:
   prev_review_path: <직전 스프린트 review.md 절대 경로 또는 null>
 
 Read sprint-planner.md instructions. Fill in planning.md per its rules.
+Important: Use Sprint Intake Cards. Every listed task card must either become a Core Gate with `card: <id>` or be explicitly deferred in Out-of-scope. Every listed epic must either be split into concrete `card: new` gates with `source_epic: <id>` or be explicitly deferred. New work uses `card: new` and `source_epic: none`.
 Return the structured report.
 ```
 
@@ -185,25 +189,29 @@ Agent(
 
 PASS이면 사용자에게 한 줄 확인:
 
-> 점수 X.XX/10.00로 PASS. Kanban 카드 발행할까요? (epic 1장 + 게이트별 카드 N장 + 직전 스프린트 carry-over 동기화) (yes/no)
+> 점수 X.XX/10.00로 PASS. Kanban 카드 연결/발행할까요? (epic 1장 + 기존 intake 카드 gate 연결 + 새 gate 카드 발행 + 직전 스프린트 열린 카드 보고) (yes/no)
 
 `yes`이면 단일 스크립트 호출:
 
 ```bash
-uv run ~/.claude/plugins/marketplaces/kangnam-plugins/kangnam-dev/scripts/sprint/sprint-publish-cards.py <project> <version>
+uv run <plugin-root>/scripts/sprint/sprint-publish-cards.py <project> <version>
 ```
 
 스크립트가 한 번에 처리:
 - epic 카드 1장 발행 (`type: epic`, sprint 라벨)
-- planning.md의 Core Gates 개수만큼 task 카드 발행 (`gate: G1` 등 frontmatter, `--epic <epic-id>`로 묶임)
-- 직전 스프린트(N-1)의 미완료 카드 sprint 라벨을 새 버전으로 갱신 (carry-over 동기화)
+- planning.md의 Core Gate `card: <id>`는 기존 task 카드를 `project/sprint/gate`에 자동 연결
+- planning.md의 Core Gate `card: new` 또는 비어있는 레거시 gate는 새 task 카드 발행 (`gate: G1` 등 frontmatter)
+- `source_epic: <id>`가 있으면 새 task 카드를 해당 기존 epic의 child로 묶고, 없으면 sprint epic에 묶음
+- epic 카드를 `card: <id>`로 직접 구현 대상으로 쓰면 거부하고 작은 gate로 쪼개라고 안내
+- 직전 스프린트(N-1)에 아직 열린 카드가 남아 있으면 보고. 자동 relabel은 `card:` 매핑으로만 수행
 
-idempotent: 이미 같은 sprint+gate 카드가 있으면 skip. 재실행해도 중복 발행 안 됨.
+idempotent: 이미 같은 sprint+gate 카드가 있으면 skip. `card: <id>` 매핑은 같은 카드에 metadata를 재적용하므로 재실행해도 중복 발행 안 됨.
 
 세부 제어 플래그 (필요 시):
 - `--no-epic` epic만 빼고
 - `--no-gate-cards` 게이트별 카드 빼고
-- `--no-carryover` carry-over 동기화 빼고
+- `--no-carryover` 직전 스프린트 열린 카드 보고 생략
+- `--legacy-carryover` 예전 방식처럼 직전 스프린트 미완료 카드를 모두 새 sprint로 relabel (권장 X; gate 매핑 없이 `card_only`가 생길 수 있음)
 
 `no`이면 다음 단계로.
 
@@ -213,7 +221,7 @@ idempotent: 이미 같은 sprint+gate 카드가 있으면 skip. 재실행해도 
 git -C ~/wiki commit -m "sprint(<project>): <version> planning"
 ```
 
-push 안 함 (NEVER #2).
+push 안 함.
 
 ## NEVER 규칙
 
@@ -225,6 +233,9 @@ push 안 함 (NEVER #2).
 6. NEVER: kanban-curator의 `notify` 결과를 사용자에게 표시하지 않고 다음 단계로 넘어가지 마라.
 7. NEVER: kanban-curator가 분류하지 않은 카드를 임의로 archive 처리하지 마라.
 8. NEVER: `--no-auto-archive` 플래그가 있으면 auto_archive_safe를 자동 처리하지 마라 — 사용자 컨펌.
+9. NEVER: Sprint Intake Cards에 있는 기존 카드를 gate 또는 Out-of-scope 없이 암묵적으로 방치하지 마라.
+10. NEVER: 하나의 Kanban 카드 id를 두 개 이상의 Core Gate에 매핑하지 마라.
+11. NEVER: epic 카드를 `card: <id>`로 직접 매핑하지 마라. epic은 `source_epic`으로만 사용하고 작은 task gate로 쪼갠다.
 
 ## ALWAYS 규칙
 
@@ -234,3 +245,5 @@ push 안 함 (NEVER #2).
 4. ALWAYS: Kanban epic 발행은 사용자 확인 후.
 5. ALWAYS: curator의 auto_archive_safe 처리 후 사후 보고 (몇 장이 어디로 갔는지 명시).
 6. ALWAYS: curator의 silent 카드는 카운트만 표시 (개별 표시 X).
+7. ALWAYS: planning.md의 `card:` 매핑이 publish 이후 실제 Kanban frontmatter `sprint`/`gate`로 반영되는지 확인.
+8. ALWAYS: 자유 입력으로 생성된 broad/ambiguous 카드는 epic + `needs-breakdown`으로 남기고, sprint planning에서 작은 gate로 분해.

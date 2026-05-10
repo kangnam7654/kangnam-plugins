@@ -30,11 +30,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from _sprint import (  # type: ignore
+    WIKI_ROOT,
+    FrontmatterError,
     confirm_overwrite,
     extract_action_items,
     git_add,
     list_sprints,
     normalize_version,
+    parse_frontmatter,
     previous_sprint,
     project_dir,
     sprint_dir,
@@ -67,10 +70,76 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument("--force", action="store_true", help="Overwrite existing planning.md")
     p.add_argument(
+        "--no-auto-archive",
+        action="store_true",
+        help="Accepted for slash-command orchestration; sprint-planning.py itself does not archive cards.",
+    )
+    p.add_argument(
         "--no-pull", action="store_true",
         help="Skip wiki pull (caller has already pulled)",
     )
     return p.parse_args()
+
+
+KANBAN_COLUMNS = ("Backlog", "InProgress", "Blocked")
+
+
+def build_sprint_intake(project: str, version: str, prev_sprint: str | None) -> str:
+    """List open kanban cards that planning should explicitly adopt or defer."""
+    kanban_root = WIKI_ROOT / "Kanban"
+    if not kanban_root.is_dir():
+        return "_(Kanban 보드 없음 — intake 카드 없음)_"
+
+    rows: list[dict] = []
+    for column in KANBAN_COLUMNS:
+        col_dir = kanban_root / column
+        if not col_dir.is_dir():
+            continue
+        for path in sorted(col_dir.glob("*.md")):
+            try:
+                fm, _ = parse_frontmatter(path, required=False)
+            except FrontmatterError:
+                continue
+            if fm.get("project") != project:
+                continue
+            sprint = str(fm.get("sprint") or "")
+            type_ = str(fm.get("type") or "task")
+            if sprint == version:
+                reason = "already-bound"
+            elif not sprint:
+                reason = "needs-breakdown-epic" if type_ == "epic" else "unassigned"
+            elif prev_sprint and sprint == prev_sprint:
+                reason = "carry-over-card"
+            else:
+                reason = f"old-or-other-sprint:{sprint}"
+
+            rows.append({
+                "id": fm.get("id") or path.stem,
+                "title": fm.get("title") or path.stem,
+                "column": column,
+                "type": type_,
+                "sprint": sprint or "(none)",
+                "priority": fm.get("priority") or "none",
+                "reason": reason,
+            })
+
+    if not rows:
+        return "_(현재 프로젝트의 열린 Kanban intake 카드 없음)_"
+
+    lines = [
+        "> 아래 기존 Kanban 카드들은 이번 스프린트 범위 후보입니다. "
+        "task 카드는 Core Gate의 `card` 필드에 카드 id를 쓰면 publish 단계가 sprint/gate/epic에 자동 연결합니다. "
+        "epic 카드는 직접 구현하지 말고 `source_epic`으로 연결된 작은 `card: new` gate로 쪼갭니다. "
+        "이번에 하지 않을 카드는 Out-of-scope에 이유를 적습니다.",
+        "",
+    ]
+    for row in rows:
+        lines.append(
+            f"- [{row['id']}] {row['title']} — "
+            f"type: {row['type']}, {row['column']}, sprint: {row['sprint']}, "
+            f"priority: {row['priority']}, reason: {row['reason']}"
+        )
+    return "\n".join(lines)
 
 
 PLANNING_TEMPLATE = """\
@@ -88,6 +157,10 @@ PLANNING_TEMPLATE = """\
 
 {goal_summary_placeholder}
 
+## Sprint Intake Cards
+
+{sprint_intake_block}
+
 ## 직전 스프린트 Carry-over
 
 {carryover_block}
@@ -96,11 +169,15 @@ PLANNING_TEMPLATE = """\
 
 > 각 게이트 = happy/isolation_failure/expected_reaction 3-튜플 + domain + 검증 명령.
 > - **domain**: 어떤 도메인 에이전트가 구현할지 — `frontend` | `backend` | `mobile` | `data` | `devops` | `ai`
+> - **card**: 기존 task 카드를 구현하면 카드 id(예: `260509-1420`), 새 카드가 필요하면 `new`
+> - **source_epic**: 기존 epic에서 쪼개진 gate면 epic id, 아니면 `none`
 > - **검증**: 실행 가능한 명령 (예: `pytest tests/test_g1_happy.py`) 또는 `manual` (사람이 검증)
 > - 자세한 룰: [[../../../../Rules/SprintScope]]
 
 ### G1. <게이트 이름> — **채워주세요**
 - **domain**: `<frontend|backend|mobile|data|devops|ai>`
+- **card**: `<new|기존 카드 id>`
+- **source_epic**: `<none|기존 epic id>`
 - **happy** — <정상 케이스 검증>
   - 검증: `<실행 명령 또는 manual>`
 - **isolation_failure** — <격리 실패 시>
@@ -142,6 +219,7 @@ def main() -> None:
 
     prev = previous_sprint(args.project, version)
     prev_review = sprint_dir(args.project, prev) / "review.md" if prev else None
+    sprint_intake = build_sprint_intake(args.project, version, prev)
 
     fm = {
         "created": today(),
@@ -159,6 +237,7 @@ def main() -> None:
         goal_summary_placeholder=(
             args.goal if args.goal else "<왜 이 스프린트인가, 직전 스프린트 대비 무엇이 새로워지는가>"
         ),
+        sprint_intake_block=sprint_intake,
         carryover_block=build_carryover(prev_review),
     )
 
@@ -176,11 +255,8 @@ def main() -> None:
     print(f"  현재 스프린트 목록: {', '.join(existing)}")
     print()
     print("다음 단계:")
-    print(f"  1. {planning_path.name}을 열어서 페이스/Core Gates 채우기")
-    print(f"  2. Kanban 카드 발행 (예시):")
-    print(f"     uv run ~/.claude/skills/kanban/scripts/kanban-new.py \\")
-    print(f"       \"[{version}] {args.goal or '<목표>'}\" \\")
-    print(f"       --project {args.project} --sprint {version} --type epic --priority high")
+    print(f"  1. {planning_path.name}의 Sprint Intake Cards를 보고 Core Gates에 card id 또는 new 매핑")
+    print(f"  2. sprint-publish-cards.py가 기존 카드는 연결하고 new gate는 새 카드 발행")
     print(f"  3. git -C ~/wiki commit -m 'sprint({args.project}): {version} planning'")
 
 

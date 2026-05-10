@@ -42,6 +42,9 @@ from _sprint import (  # type: ignore
     write_with_frontmatter,
 )
 
+PLUGIN_ROOT = Path(__file__).resolve().parents[2]
+KANBAN_MOVE = PLUGIN_ROOT / "skills" / "kanban" / "scripts" / "kanban-move.py"
+
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Scaffold/freeze sprint progress.md.")
@@ -223,7 +226,7 @@ def alignment_warnings(
         if passed and col != "Done":
             warnings.append(
                 f"  ⚠️ 게이트 {gate} ✅ 검증 완료, 그러나 카드 [{card['id']}]는 {col}.\n"
-                f"      → uv run ~/.claude/skills/kanban/scripts/kanban-move.py {card['id']} done"
+                f"      → uv run {KANBAN_MOVE} {card['id']} done"
             )
         elif (not passed) and col == "Done":
             warnings.append(

@@ -25,10 +25,13 @@ Open `planning.md`. Identify these placeholders introduced by the scaffold:
 3. **Core Gates** section — for each gate template `### G1. <게이트 이름>`:
    - concrete heading (replaces template residue)
    - `domain:` field — one of `frontend` | `backend` | `mobile` | `data` | `devops` | `ai`
+   - `card:` field — existing Kanban card id when this gate implements an intake card, or `new` when the gate needs a new card
+   - `source_epic:` field — existing epic id when this gate is split out of an intake epic, otherwise `none`
    - 3-tuple: `happy`, `isolation_failure`, `expected_reaction`
    - per-scenario `검증:` line — runnable command (`pytest ...`, `curl ...`, `playwright test ...`) or literal string `manual`
 4. **Out-of-scope** section — `<이번 스프린트에서 명시적으로 안 하는 것...>`
-5. **Carry-over** section — already populated by script; you decide which Action Items become gates vs. deferred (does NOT get rewritten by you, but informs Out-of-scope)
+5. **Sprint Intake Cards** section — already populated by script from open Kanban cards; every listed task card must either become a gate via `card: <id>` or be explicitly deferred in Out-of-scope; every listed epic must either be split into `card: new` gates with `source_epic: <id>` or deferred
+6. **Carry-over** section — already populated by script; you decide which Action Items become gates vs. deferred (does NOT get rewritten by you, but informs Out-of-scope)
 
 You will *not* touch:
 - frontmatter (the scaffold sets it; only `updated:` may be bumped if you finish the file today)
@@ -73,6 +76,8 @@ Each gate is a *readiness gate* — a checkable claim that some part of the syst
 | Field | What it is | What it is NOT |
 |---|---|---|
 | `domain` | Exactly one of: `frontend` (web UI), `backend` (server/API), `mobile` (iOS/Android/RN/Flutter), `data` (pipelines/ETL/warehouse), `devops` (CI/deploy/infra), `ai` (LLM features). Pick the *primary* domain — if a gate truly spans two, split it into two gates. | "fullstack", "all", custom labels, blank |
+| `card` | Existing task card id from `## Sprint Intake Cards` when the gate implements that card, otherwise `new`. This drives card adoption in `/sprint-planning` Step 5. | Blank, made-up IDs, reusing one card for multiple gates, using an epic id directly |
+| `source_epic` | Existing epic card id when `card: new` is a smaller task split from that epic, otherwise `none`. | Blank, made-up IDs, using a task id as source_epic |
 | `happy` | A specific input → specific observable output. e.g., "POST /api/todos with valid JSON returns 201 + body matches Todo schema" | "API works", "기능 동작" |
 | `isolation_failure` | A named failure mode of an upstream dependency. e.g., "DB connection times out", "auth service returns 503" | "에러 발생", "문제가 생김" |
 | `expected_reaction` | Concrete deterministic system response. e.g., "Return 503 with Retry-After: 30", "Fall back to read replica, log warning" | "graceful", "fallback" (without specifying what to), "handle properly" |
@@ -82,7 +87,9 @@ If you cannot decompose the user's goal into gates of this shape, the goal itsel
 
 **On the `domain` field**: this drives `/sprint-implement`'s dispatch — which domain agent (`frontend-dev`, `backend-dev`, `mobile-dev`, `data-engineer`, `devops`, `ai-engineer`) builds the gate. A wrong domain tag = wrong agent = wasted work. If the user says "todo CRUD API", that's `backend`; "todo 화면 만들기" is `frontend`; "todo 모바일 앱" is `mobile`. If unclear, ask.
 
-**On the `검증` field**: this drives `/sprint-verify`'s automation. If you can name a command, write it (even if the test file doesn't exist yet — the developer will create it). If the gate genuinely cannot be automated (e.g., "사용자가 직관적으로 이해하는가" UX gate), write `manual` explicitly. NEVER leave it blank or "TBD" — that hides whether automation is possible.
+**On the `card` and `source_epic` fields**: read `## Sprint Intake Cards` before drafting gates. If a listed task card is part of this sprint, create a gate for it and set `card: <that id>` with `source_epic: none` unless it already belongs to an epic. If a listed epic is part of this sprint, do not set `card: <epic id>`; split it into one or more concrete gates with `card: new` and `source_epic: <epic id>`. If an intake item is not part of this sprint, put it in `Out-of-scope` with a one-line reason. Never leave card/source_epic blank and never assign the same task card id to more than one gate.
+
+**On the `검증` field**: this drives gate-verifier automation. If you can name a command, write it (even if the test file doesn't exist yet — the developer will create it). For web/macOS/iOS user-flow gates that need persona behavior evidence, prefer the reviewers adapter (`~/projects/kangnam-plugins/kangnam-dev/scripts/reviewers/review-target.py ...`) with a concrete target, goal, success criteria, persona preset, and score threshold. If the gate genuinely cannot be automated (e.g., the target cannot be launched or observed by tooling), write `manual` explicitly. NEVER leave it blank or "TBD" — that hides whether automation is possible.
 
 ### Rule 5: Carry-over discipline
 
@@ -101,10 +108,11 @@ The script already populated `## 직전 스프린트 Carry-over`. Read it. For e
    - `pace_missing`: list of {목표 기간, 일 평균 작업, 끝나는 시점} fields still placeholder
    - `gates_to_define`: number of gates needed (depends on `scale` — micro: 1–2, standard: 3–5, major: 5+; if the goal naturally splits into N concrete gates, prefer N over the band default)
    - `gate_fields_unknown`: per-gate fields where you cannot derive content
+   - `intake_cards_unassigned`: task cards from `## Sprint Intake Cards` that are neither mapped to a gate nor explicitly deferred; epic cards that are neither split via `source_epic` nor deferred
    - `outofscope_items`: carry-over items whose disposition is unclear
 5. **If anything in step 4 is non-empty**: build one `AskUserQuestion` call with all questions batched. Use clear `header` per question. Wait for answers.
 6. **Edit** `planning.md` to fill in the placeholders with answers + content you derived from goal/carry-over. Use Edit tool with exact `old_string` / `new_string` matching template phrases.
-7. **Verify**: re-read the file. Confirm zero `<...>` placeholder fragments remain (except those inside literal example blocks). Confirm zero "fallback verbs" in expected_reaction lines. Confirm pace has a concrete date.
+7. **Verify**: re-read the file. Confirm zero `<...>` placeholder fragments remain (except those inside literal example blocks). Confirm every Core Gate has `card: <existing task id|new>` and `source_epic: <existing epic id|none>`. Confirm every Sprint Intake task id appears either in one gate's `card` field or in Out-of-scope. Confirm every Sprint Intake epic id appears either in one or more gate `source_epic` fields or in Out-of-scope. Confirm zero "fallback verbs" in expected_reaction lines. Confirm pace has a concrete date.
 8. **Report** to orchestrator: short summary (gates filled: N, pace: X, outstanding questions: N), file path, and whether it is ready for critic.
 
 ## Output Format
@@ -136,6 +144,9 @@ If `<incomplete>`: explain what blocked you (user did not answer round-3, contra
 8. NEVER do more than 3 AskUserQuestion rounds. If still incomplete, report incomplete.
 9. NEVER set `domain:` outside the 6-enum list (`frontend|backend|mobile|data|devops|ai`). If the user's gate spans two domains, split into two gates.
 10. NEVER leave `검증:` blank or "TBD". Either runnable command or literal `manual`.
+11. NEVER leave an intake card implicit. A task is either mapped with `card: <id>` or explicitly deferred in Out-of-scope; an epic is either split with `source_epic: <id>` or explicitly deferred.
+12. NEVER use the same card id in more than one Core Gate.
+13. NEVER map an epic card directly as `card: <id>`.
 
 ## ALWAYS Rules
 
@@ -144,3 +155,5 @@ If `<incomplete>`: explain what blocked you (user did not answer round-3, contra
 3. ALWAYS verify your edits removed every `<...>` placeholder before reporting ready.
 4. ALWAYS use Edit (not Write) on `planning.md` — preserve frontmatter and section structure.
 5. ALWAYS use the user's exact wording for any decision they explicitly stated. If the user said "3일", write "3일", not "약 3일" or "3일 정도".
+6. ALWAYS preserve existing card ids exactly as shown in `## Sprint Intake Cards`.
+7. ALWAYS treat `type: epic` intake cards as containers that need breakdown, not as implementation cards.

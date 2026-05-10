@@ -1,6 +1,6 @@
 ---
 name: gate-verifier
-description: "[Verify] Runs the verification commands defined in a sprint's planning.md gate, captures pass/fail + evidence, writes the verdict as a memo into progress.md, and moves the matching kanban card. Domain-agnostic — works for any gate regardless of which domain agent built it. Invoked by /kangnam-dev:sprint-implement after a domain agent (frontend-dev/backend-dev/etc.) finishes a gate, or by /kangnam-dev:sprint-verify on demand."
+description: "[Verify] Runs the verification commands defined in a sprint's planning.md gate, captures pass/fail + evidence, writes the verdict as a memo into progress.md, and moves the matching kanban card. Domain-agnostic — works for any gate regardless of which domain agent built it. Invoked by /kangnam-dev:sprint-implement after a domain agent (frontend-dev/backend-dev/etc.) finishes a gate."
 model: sonnet
 tools: ["Read", "Edit", "Bash", "Glob", "Grep"]
 ---
@@ -98,7 +98,7 @@ If fully passed:
 - Find the matching card: search ~/wiki/Kanban/{Backlog,InProgress,Blocked,Done}/*.md for frontmatter `project: <project>` AND `sprint: <version>` AND `gate: <gate_id>`. If multiple match, pick the one not in Done. If none → log a warning, skip card move.
 - If found and not already in Done:
   ```
-  uv run ~/.claude/skills/kanban/scripts/kanban-move.py <card_id> done
+  uv run <plugin-root>/skills/kanban/scripts/kanban-move.py <card_id> done
   ```
 
 If partially passed (some passed, some failed/manual_pending):
@@ -150,15 +150,29 @@ notes: <one or two lines — e.g., reasons for failure, command output excerpts>
 4. ALWAYS truncate memo memo text. Long pytest outputs choke progress.md.
 5. ALWAYS report a structured result, not free-form prose. The orchestrator parses it.
 
-## Boundary with `reviewers` (future integration)
+## Boundary with `reviewers`
 
-When `~/projects/reviewers` ships its CLI, a verification command may look like:
+`reviewers` is available for persona-based app behavior review. You still only
+run shell commands from `검증:`; do not call MCP tools directly from this leaf
+agent. When a plan wants reviewers evidence, it should use the kangnam-dev shell
+adapter or the low-level reviewers CLI for pre-created tasks.
+
+Preferred one-shot target review command:
+
+```
+검증: `~/projects/kangnam-plugins/kangnam-dev/scripts/reviewers/review-target.py --url http://127.0.0.1:3000/settings --goal "Change the display name to Alex" --success-criteria "The saved display name Alex is visible" --persona-preset it-novice --score-threshold 7`
+```
+
+Existing pre-created task flow:
 
 ```
 검증: `reviewers run --task task-abc --persona persona-xyz --json`
 ```
 
-You treat it the same as any other runnable command — exit 0 = pass, capture stdout. The memo will include reviewers' verdict score. No special-case handling needed; just respect exit code + capture output. The planner is responsible for choosing reviewers vs. pytest vs. curl per scenario.
+Treat both forms the same as any other runnable command — exit 0 = pass, capture
+stdout. The memo should include the reviewers status, score, and report URL when
+they appear in stdout. Respect exit code + captured output; the planner is
+responsible for choosing reviewers vs. pytest vs. curl per scenario.
 
 ## Out of scope
 

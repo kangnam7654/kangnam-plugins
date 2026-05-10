@@ -9,6 +9,8 @@ Raw slash-command arguments:
 
 # sprint-progress
 
+`<plugin-root>`는 이 plugin의 `kangnam-dev/` 디렉토리다. 체크아웃에서 실행하면 `/Users/kangnam/projects/kangnam-plugins/kangnam-dev`, 설치본에서 실행하면 설치된 plugin의 `kangnam-dev` 루트로 해석한다.
+
 진행 중인 스프린트의 게이트 체크리스트(progress.md)를 관리. **Python 스크립트가 구조/검증을 처리**하고, AI/사용자는 게이트 검증 결과를 채워넣는다.
 
 ## 절차
@@ -16,7 +18,7 @@ Raw slash-command arguments:
 ### Step 1 · 스크립트 실행
 
 ```bash
-uv run ~/.claude/plugins/marketplaces/kangnam-plugins/kangnam-dev/scripts/sprint/sprint-progress.py $ARGUMENTS
+uv run <plugin-root>/scripts/sprint/sprint-progress.py $ARGUMENTS
 ```
 
 세 가지 모드로 동작:
@@ -62,7 +64,7 @@ uv run ~/.claude/plugins/marketplaces/kangnam-plugins/kangnam-dev/scripts/sprint
 자동 이동은 **하지 않는다** — 검증 메모는 사람이 직접 채워야 하므로. 스크립트는 경고와 명령어 힌트만 제공:
 
 ```bash
-uv run ~/.claude/skills/kanban/scripts/kanban-move.py <id> done
+uv run <plugin-root>/skills/kanban/scripts/kanban-move.py <id> done
 ```
 
 사용자가 결정 후 직접 실행.

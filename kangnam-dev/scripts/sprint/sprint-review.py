@@ -27,6 +27,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from _sprint import (  # type: ignore
+    WIKI_ROOT,
     FrontmatterError,
     confirm_overwrite,
     extract_core_gates,
@@ -49,7 +50,51 @@ def parse_args() -> argparse.Namespace:
         "--allow-unfrozen", action="store_true",
         help="Allow scaffolding review.md even if progress.md is not evergreen",
     )
+    p.add_argument(
+        "--allow-open-cards",
+        action="store_true",
+        help="Allow scaffolding review.md even if sprint kanban cards are not all Done",
+    )
     return p.parse_args()
+
+
+KANBAN_COLUMNS = ("Backlog", "InProgress", "Blocked", "Done")
+
+
+def sprint_cards(project: str, version: str) -> tuple[list[dict], list[dict]]:
+    """Return (open_cards, done_cards) for non-epic project+sprint cards."""
+    open_cards: list[dict] = []
+    done_cards: list[dict] = []
+    root = WIKI_ROOT / "Kanban"
+    if not root.is_dir():
+        return open_cards, done_cards
+
+    for column in KANBAN_COLUMNS:
+        col_dir = root / column
+        if not col_dir.is_dir():
+            continue
+        for path in sorted(col_dir.glob("*.md")):
+            try:
+                fm, _ = parse_frontmatter(path, required=False)
+            except FrontmatterError:
+                continue
+            if fm.get("project") != project or fm.get("sprint") != version:
+                continue
+            if fm.get("type") == "epic":
+                continue
+            card = {
+                "id": fm.get("id") or path.stem,
+                "title": fm.get("title") or path.stem,
+                "gate": fm.get("gate") or "",
+                "column": column,
+                "path": str(path),
+            }
+            if column == "Done":
+                done_cards.append(card)
+            else:
+                open_cards.append(card)
+
+    return open_cards, done_cards
 
 
 REVIEW_TEMPLATE = """\
@@ -137,6 +182,33 @@ def main() -> None:
         )
         sys.exit(2)
 
+    gates = extract_core_gates(planning_path)
+    open_cards, done_cards = sprint_cards(args.project, version)
+    if gates and not open_cards and not done_cards and not args.allow_open_cards:
+        print(
+            f"error: no kanban cards found for {args.project} {version}.\n"
+            f"Run sprint-planning card publication or pass --allow-open-cards "
+            f"to write a draft review.md for a legacy sprint.",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+    if open_cards and not args.allow_open_cards:
+        print(
+            f"error: sprint has {len(open_cards)} kanban card(s) not in Done.\n"
+            f"Finish or explicitly carry over cards before review, or pass "
+            f"--allow-open-cards to write a draft review.md.",
+            file=sys.stderr,
+        )
+        for card in open_cards[:10]:
+            gate = f" gate={card['gate']}" if card["gate"] else ""
+            print(
+                f"  - [{card['id']}] {card['title']} ({card['column']}{gate})",
+                file=sys.stderr,
+            )
+        if len(open_cards) > 10:
+            print(f"  ... and {len(open_cards) - 10} more", file=sys.stderr)
+        sys.exit(2)
+
     confirm_overwrite(review_path, force=args.force)
 
     try:
@@ -148,8 +220,7 @@ def main() -> None:
     period_end = progress_fm.get("updated", today())
     period = f"{period_start} ~ {period_end}"
 
-    gates = extract_core_gates(planning_path)
-    review_status = "evergreen" if progress_status == "evergreen" else "draft"
+    review_status = "growing" if progress_status == "evergreen" else "draft"
 
     fm = {
         "created": today(),
@@ -173,11 +244,12 @@ def main() -> None:
     print(f"  status: {review_status}")
     print(f"  period: {period}")
     print(f"  gates from planning.md: {len(gates)}")
+    print(f"  done cards: {len(done_cards)}")
     print()
     print("다음 단계 — retrospective 스킬을 호출하여 본문 작성:")
     print()
-    print(f"  /kangnam-dev:sprint-review {args.project} {version}")
-    print(f"  (이 명령어가 retrospective 스킬에 아래 컨텍스트 전달)")
+    print("  아래 컨텍스트를 retrospective 스킬에 전달하세요.")
+    print("  retrospective가 본문을 채우고 critic PASS 후 status를 evergreen으로 바꿉니다.")
     print()
     print(f"    mode: sprint")
     print(f"    project: {args.project}")
@@ -188,6 +260,11 @@ def main() -> None:
     print(f"    context_files:")
     print(f"      - {planning_path}")
     print(f"      - {progress_path}")
+    if done_cards:
+        print(f"    done_cards:")
+        for card in done_cards:
+            gate = f" gate={card['gate']}" if card["gate"] else ""
+            print(f"      - [{card['id']}] {card['title']} ({card['path']}{gate})")
 
 
 if __name__ == "__main__":

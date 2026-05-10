@@ -27,9 +27,12 @@ Flutter is **excluded from all consideration**. Do not include Flutter as a trad
 
 | Condition | `testing_tools.app_verification` |
 |---|---|
-| Web only (no mobile field or mobile = "N/A") | Playwright |
-| Mobile = "React Native" | iOS Simulator MCP |
-| Both web + mobile | iOS Simulator MCP + Playwright |
+| Web only (no mobile field or mobile = "N/A") | Reviewers MCP for persona review + Playwright for deterministic tests |
+| Mobile = "React Native" | Reviewers MCP for iOS Simulator persona review |
+| Both web + mobile | Reviewers MCP for web+iOS persona review + Playwright for deterministic tests |
+
+Use reviewers for task-level behavior evidence from a persona's point of view.
+Keep Playwright/unit tests for deterministic assertions that should run in CI.
 
 ## API Standard Defaults
 
