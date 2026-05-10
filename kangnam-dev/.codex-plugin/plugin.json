@@ -1,0 +1,29 @@
+{
+  "name": "kangnam-dev",
+  "version": "0.1.0",
+  "description": "End-to-end service development pipeline: idea, design, implementation, and continuous improvement loops.",
+  "author": {
+    "name": "kangnam7654"
+  },
+  "keywords": [
+    "development",
+    "kanban",
+    "sprint",
+    "agents",
+    "reviewers"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Kangnam Dev",
+    "shortDescription": "Project-local Kanban, sprint planning, implementation, review, and service development workflows",
+    "longDescription": "Kangnam Dev bundles project-local Kanban tooling, sprint planning, sprint implementation, sprint review, reviewers integration, and end-to-end service development workflows for Codex sessions.",
+    "developerName": "kangnam7654",
+    "category": "Coding",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": "Run project-local Kanban, sprint, review, or service development workflows"
+  }
+}
