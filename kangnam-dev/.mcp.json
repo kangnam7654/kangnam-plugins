@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "reviewers": {
+      "command": "bash",
+      "args": ["scripts/reviewers/reviewers-mcp.sh"],
+      "cwd": "."
+    },
+    "agent-kanban": {
+      "command": "npm",
+      "args": ["--prefix", "mcp/agent-kanban", "run", "mcp"],
+      "cwd": "."
+    }
+  }
+}
