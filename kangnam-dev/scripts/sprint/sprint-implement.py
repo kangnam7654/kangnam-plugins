@@ -21,20 +21,15 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from _sprint import (  # type: ignore
-    WIKI_ROOT,
-    FrontmatterError,
     normalize_version,
-    parse_frontmatter,
     project_dir,
     sprint_dir,
 )
+from _agent_kanban import project_working_dir, sprint_cards as load_sprint_cards  # type: ignore
 
 
 DOMAINS = {"frontend", "backend", "mobile", "data", "devops", "ai"}
 SCENARIOS = ("happy", "isolation_failure", "expected_reaction")
-KANBAN_COLUMNS = ("Backlog", "InProgress", "Blocked", "Done")
-
-
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Build sprint implementation dispatch queue.")
     p.add_argument("project")
@@ -120,7 +115,7 @@ def parse_gate_blocks(planning_path: Path) -> list[dict]:
     return gates
 
 
-def scaffold_progress(project: str, version: str, progress_path: Path) -> None:
+def scaffold_progress(project: str, version: str, progress_path: Path, working_dir: Path) -> None:
     if progress_path.is_file():
         return
     script = Path(__file__).parent / "sprint-progress.py"
@@ -162,32 +157,20 @@ def progress_gate_status(progress_path: Path) -> dict[str, str]:
     return out
 
 
-def sprint_cards(project: str, version: str) -> list[dict]:
+def sprint_cards(project: str, version: str, working_dir: Path) -> list[dict]:
     """Return non-epic kanban cards for project+sprint across active columns."""
     cards: list[dict] = []
-    root = WIKI_ROOT / "Kanban"
-    if not root.is_dir():
-        return cards
-    for column in KANBAN_COLUMNS:
-        col_dir = root / column
-        if not col_dir.is_dir():
+    for card in load_sprint_cards(project, version, working_dir, include_done=True):
+        if card.get("kind") == "epic":
             continue
-        for path in sorted(col_dir.glob("*.md")):
-            try:
-                fm, _ = parse_frontmatter(path, required=False)
-            except FrontmatterError:
-                continue
-            if fm.get("project") != project or fm.get("sprint") != version:
-                continue
-            if fm.get("type") == "epic":
-                continue
-            cards.append({
-                "id": fm.get("id") or path.stem,
-                "title": fm.get("title") or path.stem,
-                "gate": fm.get("gate") or "",
-                "column": column,
-                "path": str(path),
-            })
+        cards.append({
+            "id": card.get("id"),
+            "title": card.get("title"),
+            "gate": card.get("gate") or "",
+            "column": card.get("column") or card.get("status"),
+            "status": card.get("status"),
+            "path": card.get("path"),
+        })
     return cards
 
 
@@ -211,7 +194,7 @@ def main() -> None:
     args = parse_args()
     project_dir(args.project)
     version = normalize_version(args.project, args.version)
-    working_dir = Path(args.working_dir).expanduser() if args.working_dir else Path.home() / "projects" / args.project
+    working_dir = project_working_dir(args.project, args.working_dir)
     selected = {g.strip() for g in args.gates.split(",")} if args.gates else None
 
     sd = sprint_dir(args.project, version)
@@ -221,10 +204,10 @@ def main() -> None:
         print(f"error: planning.md missing: {planning_path}", file=sys.stderr)
         sys.exit(2)
 
-    scaffold_progress(args.project, version, progress_path)
+    scaffold_progress(args.project, version, progress_path, working_dir)
     all_gates = parse_gate_blocks(planning_path)
     statuses = progress_gate_status(progress_path)
-    cards = sprint_cards(args.project, version)
+    cards = sprint_cards(args.project, version, working_dir)
     gate_to_card, card_only, duplicate_card_gates = cards_by_gate(cards)
 
     gates = all_gates

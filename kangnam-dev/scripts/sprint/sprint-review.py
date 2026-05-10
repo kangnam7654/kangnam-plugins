@@ -27,7 +27,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from _sprint import (  # type: ignore
-    WIKI_ROOT,
     FrontmatterError,
     confirm_overwrite,
     extract_core_gates,
@@ -39,6 +38,7 @@ from _sprint import (  # type: ignore
     today,
     write_with_frontmatter,
 )
+from _agent_kanban import project_working_dir, sprint_cards as load_sprint_cards  # type: ignore
 
 
 def parse_args() -> argparse.Namespace:
@@ -55,44 +55,28 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Allow scaffolding review.md even if sprint kanban cards are not all Done",
     )
+    p.add_argument("--working-dir", help="Code/project directory whose .kanban board should be used. Default: ~/projects/<project>")
     return p.parse_args()
 
 
-KANBAN_COLUMNS = ("Backlog", "InProgress", "Blocked", "Done")
-
-
-def sprint_cards(project: str, version: str) -> tuple[list[dict], list[dict]]:
+def sprint_cards(project: str, version: str, working_dir: Path) -> tuple[list[dict], list[dict]]:
     """Return (open_cards, done_cards) for non-epic project+sprint cards."""
     open_cards: list[dict] = []
     done_cards: list[dict] = []
-    root = WIKI_ROOT / "Kanban"
-    if not root.is_dir():
-        return open_cards, done_cards
-
-    for column in KANBAN_COLUMNS:
-        col_dir = root / column
-        if not col_dir.is_dir():
+    for card in load_sprint_cards(project, version, working_dir, include_done=True):
+        if card.get("kind") == "epic":
             continue
-        for path in sorted(col_dir.glob("*.md")):
-            try:
-                fm, _ = parse_frontmatter(path, required=False)
-            except FrontmatterError:
-                continue
-            if fm.get("project") != project or fm.get("sprint") != version:
-                continue
-            if fm.get("type") == "epic":
-                continue
-            card = {
-                "id": fm.get("id") or path.stem,
-                "title": fm.get("title") or path.stem,
-                "gate": fm.get("gate") or "",
-                "column": column,
-                "path": str(path),
-            }
-            if column == "Done":
-                done_cards.append(card)
-            else:
-                open_cards.append(card)
+        normalized = {
+            "id": card.get("id"),
+            "title": card.get("title"),
+            "gate": card.get("gate") or "",
+            "column": card.get("column") or card.get("status"),
+            "path": card.get("path"),
+        }
+        if card.get("status") == "done":
+            done_cards.append(normalized)
+        else:
+            open_cards.append(normalized)
 
     return open_cards, done_cards
 
@@ -148,6 +132,7 @@ def main() -> None:
     args = parse_args()
     project_dir(args.project)
     version = normalize_version(args.project, args.version)
+    working_dir = project_working_dir(args.project, args.working_dir)
     sd = sprint_dir(args.project, version)
     planning_path = sd / "planning.md"
     progress_path = sd / "progress.md"
@@ -183,7 +168,7 @@ def main() -> None:
         sys.exit(2)
 
     gates = extract_core_gates(planning_path)
-    open_cards, done_cards = sprint_cards(args.project, version)
+    open_cards, done_cards = sprint_cards(args.project, version, working_dir)
     if gates and not open_cards and not done_cards and not args.allow_open_cards:
         print(
             f"error: no kanban cards found for {args.project} {version}.\n"
@@ -243,6 +228,7 @@ def main() -> None:
     print(f"\n✓ scaffolded: {review_path}")
     print(f"  status: {review_status}")
     print(f"  period: {period}")
+    print(f"  Kanban: {working_dir}/.kanban/kanban-data.json")
     print(f"  gates from planning.md: {len(gates)}")
     print(f"  done cards: {len(done_cards)}")
     print()

@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import argparse
 import re
-import subprocess
 import sys
 from pathlib import Path
 
@@ -41,9 +40,9 @@ from _sprint import (  # type: ignore
     today,
     write_with_frontmatter,
 )
+from _agent_kanban import AGENT_KANBAN, project_working_dir, sprint_cards as load_sprint_cards  # type: ignore
 
 PLUGIN_ROOT = Path(__file__).resolve().parents[2]
-KANBAN_MOVE = PLUGIN_ROOT / "skills" / "kanban" / "scripts" / "kanban-move.py"
 
 
 def parse_args() -> argparse.Namespace:
@@ -52,6 +51,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("version")
     p.add_argument("--freeze", action="store_true", help="Freeze sprint (status: evergreen)")
     p.add_argument("--force", action="store_true", help="Force freeze even with unchecked gates")
+    p.add_argument("--working-dir", help="Code/project directory whose .kanban board should be used. Default: ~/projects/<project>")
     return p.parse_args()
 
 
@@ -130,41 +130,20 @@ def count_gate_progress(progress_path: Path) -> tuple[int, int, list[str]]:
     return (checked, total, problems)
 
 
-def kanban_cards_for_sprint(project: str, version: str) -> dict[str, list[dict]]:
+def kanban_cards_for_sprint(project: str, version: str, working_dir: Path) -> dict[str, list[dict]]:
     """Return cards by column for this sprint.
     Each card dict: {id, title, gate, type}. `gate` may be empty string.
     """
-    kanban_root = WIKI_ROOT / "Kanban"
-    result: dict[str, list[dict]] = {"InProgress": [], "Done": [], "Backlog": [], "Blocked": []}
-    if not kanban_root.is_dir():
-        return result
-    for col in result:
-        col_dir = kanban_root / col
-        if not col_dir.is_dir():
-            continue
-        for card in col_dir.glob("*.md"):
-            text = card.read_text(encoding="utf-8")
-            fm_m = re.match(r"^---\n(.*?)\n---", text, re.S)
-            if not fm_m:
-                continue
-            fm_text = fm_m.group(1)
-            proj_m = re.search(r"^project:\s*(.+)$", fm_text, re.M)
-            spr_m = re.search(r"^sprint:\s*(.+)$", fm_text, re.M)
-            if not (proj_m and proj_m.group(1).strip() == project):
-                continue
-            spr = spr_m.group(1).strip() if spr_m else ""
-            if spr != version:
-                continue
-            id_m = re.search(r"^id:\s*(.+)$", fm_text, re.M)
-            title_m = re.search(r"^title:\s*(.+)$", fm_text, re.M)
-            gate_m = re.search(r"^gate:\s*(.+)$", fm_text, re.M)
-            type_m = re.search(r"^type:\s*(.+)$", fm_text, re.M)
-            result[col].append({
-                "id": id_m.group(1).strip().strip("\"'") if id_m else card.stem,
-                "title": title_m.group(1).strip().strip("\"'") if title_m else card.stem,
-                "gate": gate_m.group(1).strip().strip("\"'") if gate_m else "",
-                "type": type_m.group(1).strip().strip("\"'") if type_m else "",
-            })
+    result: dict[str, list[dict]] = {"Ready": [], "InProgress": [], "Review": [], "Done": [], "Backlog": [], "Blocked": []}
+    for card in load_sprint_cards(project, version, working_dir, include_done=True):
+        col = card.get("column") or card.get("status") or ""
+        result.setdefault(col, []).append({
+            "id": card.get("id"),
+            "title": card.get("title"),
+            "gate": card.get("gate") or "",
+            "type": card.get("kind") or "task",
+            "status": card.get("status") or "",
+        })
     return result
 
 
@@ -195,7 +174,7 @@ def gate_check_status(progress_path: Path) -> dict[str, bool]:
 
 
 def alignment_warnings(
-    progress_path: Path, cards_by_col: dict[str, list[dict]],
+    progress_path: Path, cards_by_col: dict[str, list[dict]], working_dir: Path,
 ) -> list[str]:
     """Compare progress.md gate status vs gate-card columns.
 
@@ -226,7 +205,7 @@ def alignment_warnings(
         if passed and col != "Done":
             warnings.append(
                 f"  ⚠️ 게이트 {gate} ✅ 검증 완료, 그러나 카드 [{card['id']}]는 {col}.\n"
-                f"      → uv run {KANBAN_MOVE} {card['id']} done"
+                f"      → {AGENT_KANBAN} done {card['id']} --cwd {working_dir} --summary \"{gate} 검증 완료\""
             )
         elif (not passed) and col == "Done":
             warnings.append(
@@ -273,7 +252,7 @@ def freeze(progress_path: Path, force: bool) -> None:
     print(f"  ({checked}/{total} gates)")
 
 
-def report(progress_path: Path, project: str, version: str) -> None:
+def report(progress_path: Path, project: str, version: str, working_dir: Path) -> None:
     try:
         fm, _ = parse_frontmatter(progress_path)
     except FrontmatterError as e:
@@ -284,17 +263,18 @@ def report(progress_path: Path, project: str, version: str) -> None:
         sys.exit(2)
     status = fm["status"]
     checked, total, problems = count_gate_progress(progress_path)
-    cards = kanban_cards_for_sprint(project, version)
+    cards = kanban_cards_for_sprint(project, version, working_dir)
 
     print(f"\n=== {project} {version} 진행 상황 ===")
     print(f"  파일: {progress_path}")
+    print(f"  Kanban: {working_dir}/.kanban/kanban-data.json")
     print(f"  상태: {status}")
     print(f"  게이트: {checked}/{total} ✅")
     if problems:
         print(f"  ⚠️  검증 부실한 [x] 게이트 {len(problems)}건 (placeholder/날짜 누락/메모 부족) — 동결 시 거부됨")
     print()
     print(f"  Kanban (sprint={version}):")
-    for col in ("InProgress", "Backlog", "Done", "Blocked"):
+    for col in ("InProgress", "Ready", "Review", "Backlog", "Done", "Blocked"):
         if not cards.get(col):
             continue
         print(f"    {col}: {len(cards[col])}")
@@ -303,7 +283,7 @@ def report(progress_path: Path, project: str, version: str) -> None:
             type_tag = " (epic)" if c.get("type") == "epic" else ""
             print(f"      -{gate_tag}{type_tag} {c['title']}")
 
-    warnings = alignment_warnings(progress_path, cards)
+    warnings = alignment_warnings(progress_path, cards, working_dir)
     if warnings:
         print()
         print(f"  🔔 게이트-카드 정합성 경고 {len(warnings)}건:")
@@ -322,6 +302,7 @@ def main() -> None:
     args = parse_args()
     project_dir(args.project)
     version = normalize_version(args.project, args.version)
+    working_dir = project_working_dir(args.project, args.working_dir)
     sd = sprint_dir(args.project, version)
     planning_path = sd / "planning.md"
     progress_path = sd / "progress.md"
@@ -358,7 +339,7 @@ def main() -> None:
     if args.freeze:
         freeze(progress_path, args.force)
     else:
-        report(progress_path, args.project, version)
+        report(progress_path, args.project, version, working_dir)
 
 
 if __name__ == "__main__":

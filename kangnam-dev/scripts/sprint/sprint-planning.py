@@ -19,7 +19,7 @@ What it does (safe / structured parts):
 
 It does NOT:
 - Generate Core Gate content (that's the AI's job after running this)
-- Create Kanban cards (delegated to kanban-new.py — caller invokes)
+- Create Kanban cards (delegated to sprint-publish-cards.py)
 - Push (NEVER)
 """
 from __future__ import annotations
@@ -44,6 +44,7 @@ from _sprint import (  # type: ignore
     today,
     write_with_frontmatter,
 )
+from _agent_kanban import ACTIVE_STATUSES, list_cards, project_working_dir, status_label  # type: ignore
 
 
 def parse_args() -> argparse.Namespace:
@@ -78,50 +79,38 @@ def parse_args() -> argparse.Namespace:
         "--no-pull", action="store_true",
         help="Skip wiki pull (caller has already pulled)",
     )
+    p.add_argument("--working-dir", help="Code/project directory whose .kanban board should be used. Default: ~/projects/<project>")
     return p.parse_args()
 
 
-KANBAN_COLUMNS = ("Backlog", "InProgress", "Blocked")
-
-
-def build_sprint_intake(project: str, version: str, prev_sprint: str | None) -> str:
+def build_sprint_intake(project: str, version: str, prev_sprint: str | None, working_dir: Path) -> str:
     """List open kanban cards that planning should explicitly adopt or defer."""
-    kanban_root = WIKI_ROOT / "Kanban"
-    if not kanban_root.is_dir():
-        return "_(Kanban 보드 없음 — intake 카드 없음)_"
-
     rows: list[dict] = []
-    for column in KANBAN_COLUMNS:
-        col_dir = kanban_root / column
-        if not col_dir.is_dir():
+    for card in list_cards(working_dir, include_done=False):
+        if card.get("project") != project:
             continue
-        for path in sorted(col_dir.glob("*.md")):
-            try:
-                fm, _ = parse_frontmatter(path, required=False)
-            except FrontmatterError:
-                continue
-            if fm.get("project") != project:
-                continue
-            sprint = str(fm.get("sprint") or "")
-            type_ = str(fm.get("type") or "task")
-            if sprint == version:
-                reason = "already-bound"
-            elif not sprint:
-                reason = "needs-breakdown-epic" if type_ == "epic" else "unassigned"
-            elif prev_sprint and sprint == prev_sprint:
-                reason = "carry-over-card"
-            else:
-                reason = f"old-or-other-sprint:{sprint}"
+        if card.get("status") not in ACTIVE_STATUSES:
+            continue
+        sprint = str(card.get("sprint") or "")
+        type_ = str(card.get("kind") or "task")
+        if sprint == version:
+            reason = "already-bound"
+        elif not sprint:
+            reason = "needs-breakdown-epic" if type_ == "epic" else "unassigned"
+        elif prev_sprint and sprint == prev_sprint:
+            reason = "carry-over-card"
+        else:
+            reason = f"old-or-other-sprint:{sprint}"
 
-            rows.append({
-                "id": fm.get("id") or path.stem,
-                "title": fm.get("title") or path.stem,
-                "column": column,
-                "type": type_,
-                "sprint": sprint or "(none)",
-                "priority": fm.get("priority") or "none",
-                "reason": reason,
-            })
+        rows.append({
+            "id": card.get("id"),
+            "title": card.get("title"),
+            "column": status_label(card),
+            "type": type_,
+            "sprint": sprint or "(none)",
+            "priority": card.get("priority") or "none",
+            "reason": reason,
+        })
 
     if not rows:
         return "_(현재 프로젝트의 열린 Kanban intake 카드 없음)_"
@@ -169,7 +158,7 @@ PLANNING_TEMPLATE = """\
 
 > 각 게이트 = happy/isolation_failure/expected_reaction 3-튜플 + domain + 검증 명령.
 > - **domain**: 어떤 도메인 에이전트가 구현할지 — `frontend` | `backend` | `mobile` | `data` | `devops` | `ai`
-> - **card**: 기존 task 카드를 구현하면 카드 id(예: `260509-1420`), 새 카드가 필요하면 `new`
+> - **card**: 기존 task 카드를 구현하면 카드 id(예: `KBN-1002`), 새 카드가 필요하면 `new`
 > - **source_epic**: 기존 epic에서 쪼개진 gate면 epic id, 아니면 `none`
 > - **검증**: 실행 가능한 명령 (예: `pytest tests/test_g1_happy.py`) 또는 `manual` (사람이 검증)
 > - 자세한 룰: [[../../../../Rules/SprintScope]]
@@ -210,6 +199,7 @@ def main() -> None:
 
     project_dir(args.project)  # validate
     version = normalize_version(args.project, args.version)
+    working_dir = project_working_dir(args.project, args.working_dir)
     if version != args.version:
         print(f"note: normalized version '{args.version}' → '{version}' to match project convention")
 
@@ -219,7 +209,7 @@ def main() -> None:
 
     prev = previous_sprint(args.project, version)
     prev_review = sprint_dir(args.project, prev) / "review.md" if prev else None
-    sprint_intake = build_sprint_intake(args.project, version, prev)
+    sprint_intake = build_sprint_intake(args.project, version, prev, working_dir)
 
     fm = {
         "created": today(),
@@ -248,6 +238,7 @@ def main() -> None:
     print()
     print(f"✓ 스프린트 시작: {args.project} {version}")
     print(f"  파일: {planning_path}")
+    print(f"  Kanban: {working_dir}/.kanban/kanban-data.json")
     if prev:
         print(f"  직전 스프린트: {prev} (carry-over {len(extract_action_items(prev_review))}건)")
     else:

@@ -14,6 +14,7 @@ The orchestrator gives you:
 - `version`: e.g., `0.0.8`
 - `gate_id`: one of `G1`, `G2`, ... (must match a heading in planning.md)
 - `working_dir`: absolute path to the project's working directory (e.g., `~/projects/lunawave`) — where commands run
+- `plugin_root`: absolute path to `kangnam-dev` plugin root, so `<plugin-root>/scripts/agent-kanban/agent-kanban.sh` can be executed
 - `planning_path`: absolute path to `~/wiki/Projects/<project>/Sprints/<version>/planning.md`
 - `progress_path`: absolute path to `~/wiki/Projects/<project>/Sprints/<version>/progress.md` (must exist — orchestrator scaffolds it via `sprint-progress.py` first if missing)
 
@@ -94,16 +95,27 @@ If a scenario line is already `- [x]` with a non-placeholder memo, do **not** ov
 
 A gate is **fully passed** if every scenario is `- [x]` with a real memo (no placeholders, no manual_pending).
 
+Use the project-local agent-kanban board. The data source is
+`<working_dir>/.kanban/kanban-data.json`; do not search or edit `~/wiki/Kanban`.
+
 If fully passed:
-- Find the matching card: search ~/wiki/Kanban/{Backlog,InProgress,Blocked,Done}/*.md for frontmatter `project: <project>` AND `sprint: <version>` AND `gate: <gate_id>`. If multiple match, pick the one not in Done. If none → log a warning, skip card move.
+- Find the matching card:
+  ```
+  <plugin-root>/scripts/agent-kanban/agent-kanban.sh list --cwd <working_dir> --project <project> --sprint <version> --gate <gate_id> --include-done --json
+  ```
+  If multiple match, pick the one not in `done`. If none → log a warning, skip card move.
 - If found and not already in Done:
   ```
-  uv run <plugin-root>/skills/kanban/scripts/kanban-move.py <card_id> done
+  <plugin-root>/scripts/agent-kanban/agent-kanban.sh done <card_id> --cwd <working_dir> --summary "<gate_id> verification passed" --test-command "<verification command summary>" --test-status passed --test-summary "<short evidence summary>"
   ```
 
 If partially passed (some passed, some failed/manual_pending):
-- If card exists in Backlog → move to InProgress.
-- If card already in InProgress/Blocked/Done → leave it (do not move).
+- Find the same card with `agent-kanban list`.
+- If card exists in `backlog` or `ready` → move to `in_progress`:
+  ```
+  <plugin-root>/scripts/agent-kanban/agent-kanban.sh move <card_id> in_progress --cwd <working_dir> --note "<gate_id> partially verified"
+  ```
+- If card already in `in_progress`, `review`, `blocked`, or `done` → leave it.
 
 If all failed:
 - Leave card where it is. Recovery is the developer's job.
@@ -179,4 +191,4 @@ responsible for choosing reviewers vs. pytest vs. curl per scenario.
 - Writing test files (that's the domain agent's job during /sprint-implement)
 - Deciding whether a gate's definition makes sense (planner's job, evaluated by critic)
 - Running multiple gates in parallel (orchestrator dispatches one verifier per gate)
-- Editing planning.md or kanban frontmatter (only progress.md and `kanban-move.py` allowed)
+- Editing planning.md or `.kanban/kanban-data.json` by hand. Only update `progress.md` directly; update cards through `agent-kanban`.

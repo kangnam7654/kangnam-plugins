@@ -135,6 +135,8 @@ export class KanbanStore {
                 description: input.description?.trim() ?? "",
                 kind,
                 ...(kind === "task" && epicId ? { epicId } : {}),
+                ...(input.sprint?.trim() ? { sprint: input.sprint.trim() } : {}),
+                ...(input.gate?.trim() ? { gate: input.gate.trim() } : {}),
                 status: input.status ?? "backlog",
                 priority: input.priority ?? "medium",
                 project: input.project?.trim() || data.settings.defaultProject,
@@ -151,6 +153,85 @@ export class KanbanStore {
                 updatedAt: now
             };
             data.cards.push(card);
+            return card;
+        });
+    }
+    async updateCard(input) {
+        validateNonEmpty(input.cardId, "cardId");
+        return this.mutate((data) => {
+            const card = requireCard(data, input.cardId);
+            if (input.title !== undefined) {
+                validateNonEmpty(input.title, "title");
+                card.title = input.title.trim();
+            }
+            if (input.description !== undefined)
+                card.description = input.description.trim();
+            if (input.kind !== undefined) {
+                validateCardKind(input.kind);
+                card.kind = input.kind;
+                if (input.kind === "epic")
+                    delete card.epicId;
+            }
+            if (input.epicId !== undefined) {
+                const epicId = input.epicId?.trim() || "";
+                if (!epicId) {
+                    delete card.epicId;
+                }
+                else {
+                    const epic = data.cards.find((item) => item.id === epicId);
+                    if (!epic)
+                        throw new KanbanStoreError(`Epic ${epicId} was not found.`, 404);
+                    if (epic.kind !== "epic")
+                        throw new KanbanStoreError(`${epicId} is not an epic card.`);
+                    if (card.kind === "epic")
+                        throw new KanbanStoreError("Epic cards cannot be nested under another epic.");
+                    card.epicId = epicId;
+                }
+            }
+            if (input.sprint !== undefined) {
+                const sprint = input.sprint?.trim() || "";
+                if (sprint)
+                    card.sprint = sprint;
+                else
+                    delete card.sprint;
+            }
+            if (input.gate !== undefined) {
+                const gate = input.gate?.trim() || "";
+                if (gate)
+                    card.gate = gate;
+                else
+                    delete card.gate;
+            }
+            if (input.status !== undefined) {
+                validateStatus(input.status);
+                card.status = input.status;
+                if (input.status === "done")
+                    card.completedAt = card.completedAt ?? new Date().toISOString();
+                else
+                    delete card.completedAt;
+            }
+            if (input.priority !== undefined) {
+                validatePriority(input.priority);
+                card.priority = input.priority;
+            }
+            if (input.project !== undefined) {
+                validateNonEmpty(input.project, "project");
+                card.project = input.project.trim();
+            }
+            if (input.branch !== undefined) {
+                const branch = input.branch?.trim() || "";
+                if (branch)
+                    card.branch = branch;
+                else
+                    delete card.branch;
+            }
+            if (input.tags !== undefined)
+                card.tags = input.tags === null ? [] : sanitizeTags(input.tags);
+            if (input.nextAction !== undefined)
+                card.nextAction = input.nextAction.trim();
+            card.cwd = this.defaultCwd;
+            card.updatedAt = new Date().toISOString();
+            card.activity.push(activity("agent", "progress", "Card metadata updated."));
             return card;
         });
     }
@@ -313,6 +394,10 @@ function applyFilters(cards, filters) {
             return false;
         if (filters.epicId && card.epicId !== filters.epicId)
             return false;
+        if (filters.sprint && card.sprint !== filters.sprint)
+            return false;
+        if (filters.gate && card.gate !== filters.gate)
+            return false;
         if (filters.project && card.project !== filters.project)
             return false;
         if (filters.cwd && card.cwd !== filters.cwd)
@@ -324,7 +409,7 @@ function applyFilters(cards, filters) {
         if (filters.assigneeKind && card.assignee.kind !== filters.assigneeKind)
             return false;
         if (query) {
-            const haystack = [card.id, card.title, card.description, card.kind, card.epicId ?? "", card.nextAction, card.project, card.cwd, card.branch ?? "", card.tags.join(" ")].join(" ").toLowerCase();
+            const haystack = [card.id, card.title, card.description, card.kind, card.epicId ?? "", card.sprint ?? "", card.gate ?? "", card.nextAction, card.project, card.cwd, card.branch ?? "", card.tags.join(" ")].join(" ").toLowerCase();
             if (!haystack.includes(query))
                 return false;
         }
@@ -352,6 +437,8 @@ function normalizeCard(card) {
         ...card,
         kind,
         ...(kind === "task" && card.epicId?.trim() ? { epicId: card.epicId.trim() } : { epicId: undefined }),
+        ...(card.sprint?.trim() ? { sprint: card.sprint.trim() } : { sprint: undefined }),
+        ...(card.gate?.trim() ? { gate: card.gate.trim() } : { gate: undefined }),
         tags: Array.isArray(card.tags) ? card.tags : [],
         filesTouched: Array.isArray(card.filesTouched) ? card.filesTouched : [],
         tests: Array.isArray(card.tests) ? card.tests : [],
@@ -440,6 +527,11 @@ function toTestResult(input) {
 function validateStatus(status) {
     if (!COLUMN_DEFINITIONS.some((column) => column.id === status)) {
         throw new KanbanStoreError(`Invalid status ${status}. Expected one of: ${COLUMN_DEFINITIONS.map((column) => column.id).join(", ")}.`);
+    }
+}
+function validatePriority(priority) {
+    if (!PRIORITIES.includes(priority)) {
+        throw new KanbanStoreError(`Invalid priority ${priority}. Expected one of: ${PRIORITIES.join(", ")}.`);
     }
 }
 function validateCardKind(kind) {

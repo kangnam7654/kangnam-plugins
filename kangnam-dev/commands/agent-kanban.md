@@ -1,7 +1,6 @@
 ---
 description: "프로젝트 로컬 LLM 개발 칸반(agent-kanban) CLI/MCP/UI 사용. ~/wiki Kanban이 아니라 각 프로젝트의 .kanban 보드를 쓴다."
 argument-hint: "[context|create|ui|mcp|help] [--cwd <project-dir>]"
-disable-model-invocation: true
 ---
 
 Raw slash-command arguments:
@@ -33,6 +32,12 @@ CLI를 우선 사용한다:
 
 ```bash
 <plugin-root>/scripts/agent-kanban/agent-kanban.sh progress KBN-1001 --cwd "$PWD" --msg "진행 내용" --files src/file.ts --test-command "npm test" --test-status passed --test-summary "관련 테스트 통과"
+```
+
+sprint/gate 메타데이터 연결:
+
+```bash
+<plugin-root>/scripts/agent-kanban/agent-kanban.sh set KBN-1002 --cwd "$PWD" --project "<project>" --sprint "0.2.0" --gate "G1"
 ```
 
 완료:

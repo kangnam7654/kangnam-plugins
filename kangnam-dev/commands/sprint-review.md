@@ -1,7 +1,6 @@
 ---
 description: "스프린트 리뷰/회고. 산출물 리뷰 후 review.md 스캐폴드 + retrospective + Rule 업데이트 후보 처리."
 argument-hint: "<project> <version>"
-disable-model-invocation: true
 ---
 
 Raw slash-command arguments:

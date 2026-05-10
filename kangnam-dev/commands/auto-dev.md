@@ -1,7 +1,6 @@
 ---
 description: "Fully automated app development pipeline. Runs 36 steps from ideation to design, implementation, and verification from a single sentence input. For new apps/services only — not for modifying existing code, bug fixes, or refactoring."
 argument-hint: "[--bm] [--max-loops <n>] [--budget-tokens <n>] [--resume] <one-sentence app description>"
-disable-model-invocation: true
 ---
 
 Raw slash-command arguments:

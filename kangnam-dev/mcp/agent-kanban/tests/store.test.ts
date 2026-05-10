@@ -28,6 +28,8 @@ describe("KanbanStore", () => {
         title: "Add persistent MCP workflow",
         status: "ready",
         priority: "high",
+        sprint: "0.2.0",
+        gate: "G1",
         cwd: "/workspace/demo",
         branch: "feature/kanban",
         tags: ["mcp"],
@@ -49,6 +51,8 @@ describe("KanbanStore", () => {
       });
       expect(claimed.status).toBe("in_progress");
       expect(claimed.assignee.sessionId).toBe("session-1");
+      expect(claimed.sprint).toBe("0.2.0");
+      expect(claimed.gate).toBe("G1");
 
       const progressed = await store.appendProgress({
         cardId: created.id,
@@ -113,6 +117,41 @@ describe("KanbanStore", () => {
       expect(board.cards.find((card) => card.id === task.id)?.epicId).toBe(epic.id);
       expect((await store.getMetrics()).epics).toBe(1);
       expect((await store.listCards({ epicId: epic.id })).cards.map((card) => card.id)).toEqual([task.id]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("updates sprint and gate metadata for existing cards", async () => {
+    const { store, dir } = await testStore();
+    try {
+      const epic = await store.createCard({ title: "Sprint UX epic", kind: "epic", status: "ready" });
+      const task = await store.createCard({ title: "Wire one sprint gate", status: "ready" });
+
+      const updated = await store.updateCard({
+        cardId: task.id,
+        epicId: epic.id,
+        sprint: "0.3.0",
+        gate: "G2",
+        project: "demo",
+        priority: "urgent"
+      });
+
+      expect(updated.epicId).toBe(epic.id);
+      expect(updated.sprint).toBe("0.3.0");
+      expect(updated.gate).toBe("G2");
+      expect(updated.project).toBe("demo");
+      expect((await store.listCards({ sprint: "0.3.0", gate: "G2" })).cards.map((card) => card.id)).toEqual([task.id]);
+
+      const cleared = await store.updateCard({
+        cardId: task.id,
+        epicId: null,
+        sprint: null,
+        gate: null
+      });
+      expect(cleared.epicId).toBeUndefined();
+      expect(cleared.sprint).toBeUndefined();
+      expect(cleared.gate).toBeUndefined();
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

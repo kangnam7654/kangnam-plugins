@@ -63,6 +63,8 @@ export interface KanbanCard {
   description: string;
   kind: CardKind;
   epicId?: string | undefined;
+  sprint?: string | undefined;
+  gate?: string | undefined;
   status: CardStatus;
   priority: Priority;
   project: string;
@@ -111,6 +113,8 @@ export interface CardFilters {
   status?: CardStatus | undefined;
   kind?: CardKind | undefined;
   epicId?: string | undefined;
+  sprint?: string | undefined;
+  gate?: string | undefined;
   project?: string | undefined;
   cwd?: string | undefined;
   branch?: string | undefined;
@@ -160,6 +164,8 @@ export interface CreateCardInput {
   status?: CardStatus | undefined;
   kind?: CardKind | undefined;
   epicId?: string | undefined;
+  sprint?: string | undefined;
+  gate?: string | undefined;
   priority?: Priority | undefined;
   project?: string | undefined;
   cwd?: string | undefined;
@@ -174,6 +180,23 @@ export interface ClaimCardInput {
   cwd?: string | undefined;
   branch?: string | undefined;
   note?: string | undefined;
+}
+
+export interface UpdateCardInput {
+  cardId: string;
+  cwd?: string | undefined;
+  title?: string | undefined;
+  description?: string | undefined;
+  kind?: CardKind | undefined;
+  epicId?: string | null | undefined;
+  sprint?: string | null | undefined;
+  gate?: string | null | undefined;
+  status?: CardStatus | undefined;
+  priority?: Priority | undefined;
+  project?: string | undefined;
+  branch?: string | null | undefined;
+  tags?: string[] | null | undefined;
+  nextAction?: string | undefined;
 }
 
 export interface MoveCardInput {

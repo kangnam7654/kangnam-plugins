@@ -1,7 +1,6 @@
 ---
 description: "Continuous improvement pipeline that runs auto-improve in multiple rounds until a target quality score is reached. Each round runs full Audit→Design→Build→Verify, remembering previous results and reprioritizing."
 argument-hint: "[--target-score <n>] [--max-rounds <n>] [<auto-improve flags>] <codebase path>"
-disable-model-invocation: true
 ---
 
 Raw slash-command arguments:

@@ -24,8 +24,9 @@ const HELP = `agent-kanban: project-local Kanban for LLM development sessions
 Usage:
   agent-kanban context --cwd <path> [--branch <name>] [--json]
   agent-kanban start --cwd <path> [--branch <name>] [--session <id>]
-  agent-kanban list --cwd <path> [--status ready] [--kind task] [--epic KBN-1001] [--json]
-  agent-kanban create "Title" --cwd <path> [--type task|epic] [--epic KBN-1001] [--priority high] [--status ready] [--tags api,ui] [--next "..."]
+  agent-kanban list --cwd <path> [--project name] [--status ready] [--kind task] [--epic KBN-1001] [--sprint 0.2.0] [--gate G1] [--json]
+  agent-kanban create "Title" --cwd <path> [--type task|epic] [--epic KBN-1001] [--sprint 0.2.0] [--gate G1] [--priority high] [--status ready] [--tags api,ui] [--next "..."]
+  agent-kanban set <card-id> --cwd <path> [--sprint 0.2.0|none] [--gate G1|none] [--epic KBN-1001|none] [--project name]
   agent-kanban claim <card-id> --cwd <path> --session <id>
   agent-kanban move <card-id> <status> --cwd <path>
   agent-kanban progress <card-id> --cwd <path> --msg "..." [--files a,b] [--next "..."] [--test-command "..."] [--test-status passed] [--test-summary "..."]
@@ -63,6 +64,10 @@ async function main(): Promise<void> {
     case "create":
     case "new":
       await createCommand(store, parsed, cwd, json);
+      break;
+    case "set":
+    case "update":
+      await setCommand(store, parsed, cwd, json);
       break;
     case "claim":
       await claimCommand(store, parsed, cwd, json);
@@ -117,6 +122,9 @@ async function listCommand(store: KanbanStore, flags: Flags, json: boolean): Pro
     status: stringFlag(flags, "status") as CardStatus | undefined,
     kind: stringFlag(flags, "kind") as CardFilters["kind"],
     epicId: stringFlag(flags, "epic") ?? stringFlag(flags, "epic-id"),
+    sprint: stringFlag(flags, "sprint"),
+    gate: stringFlag(flags, "gate"),
+    project: stringFlag(flags, "project"),
     branch: stringFlag(flags, "branch"),
     tag: stringFlag(flags, "tag"),
     query: stringFlag(flags, "query"),
@@ -139,8 +147,34 @@ async function createCommand(store: KanbanStore, parsed: ParsedArgs, cwd: string
     status: (stringFlag(parsed.flags, "status") as CardStatus | undefined) ?? "backlog",
     kind: (stringFlag(parsed.flags, "type") ?? stringFlag(parsed.flags, "kind")) as CardFilters["kind"],
     epicId: stringFlag(parsed.flags, "epic") ?? stringFlag(parsed.flags, "epic-id"),
+    sprint: stringFlag(parsed.flags, "sprint"),
+    gate: stringFlag(parsed.flags, "gate"),
     priority: (stringFlag(parsed.flags, "priority") as Priority | undefined) ?? "medium",
+    project: stringFlag(parsed.flags, "project"),
     tags: csvFlag(parsed.flags, "tags"),
+    nextAction: stringFlag(parsed.flags, "next")
+  });
+  write(json ? JSON.stringify(card, null, 2) : compactCard(card));
+}
+
+async function setCommand(store: KanbanStore, parsed: ParsedArgs, cwd: string, json: boolean): Promise<void> {
+  const cardId = requirePositional(parsed, 0, "card-id");
+  const type = (stringFlag(parsed.flags, "type") ?? stringFlag(parsed.flags, "kind")) as CardFilters["kind"];
+  const epicId = firstDefined(nullableFlag(parsed.flags, "epic"), nullableFlag(parsed.flags, "epic-id"));
+  const card = await store.updateCard({
+    cardId,
+    cwd,
+    title: stringFlag(parsed.flags, "title"),
+    description: stringFlag(parsed.flags, "desc") ?? stringFlag(parsed.flags, "description"),
+    kind: type,
+    epicId,
+    sprint: nullableFlag(parsed.flags, "sprint"),
+    gate: nullableFlag(parsed.flags, "gate"),
+    status: stringFlag(parsed.flags, "status") as CardStatus | undefined,
+    priority: stringFlag(parsed.flags, "priority") as Priority | undefined,
+    project: stringFlag(parsed.flags, "project"),
+    branch: nullableFlag(parsed.flags, "branch"),
+    tags: tagsUpdateFlag(parsed.flags),
     nextAction: stringFlag(parsed.flags, "next")
   });
   write(json ? JSON.stringify(card, null, 2) : compactCard(card));
@@ -236,6 +270,8 @@ function compactCard(card: KanbanCard): string {
     card.id,
     `type=${card.kind}`,
     card.epicId ? `epic=${card.epicId}` : "",
+    card.sprint ? `sprint=${quote(card.sprint)}` : "",
+    card.gate ? `gate=${card.gate}` : "",
     `status=${card.status}`,
     `priority=${card.priority}`,
     `title=${quote(card.title)}`,
@@ -309,6 +345,26 @@ function csvFlag(flags: Flags, name: string): string[] {
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function nullableFlag(flags: Flags, name: string): string | null | undefined {
+  const value = stringFlag(flags, name);
+  if (value === undefined) return undefined;
+  return value.toLowerCase() === "none" ? null : value;
+}
+
+function tagsUpdateFlag(flags: Flags): string[] | null | undefined {
+  const value = stringFlag(flags, "tags");
+  if (value === undefined) return undefined;
+  if (value.toLowerCase() === "none") return null;
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function firstDefined<T>(...values: Array<T | undefined>): T | undefined {
+  return values.find((value) => value !== undefined);
 }
 
 function requirePositional(parsed: ParsedArgs, index: number, label: string): string {

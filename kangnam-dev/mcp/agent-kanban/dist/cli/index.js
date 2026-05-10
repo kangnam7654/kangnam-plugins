@@ -6,8 +6,9 @@ const HELP = `agent-kanban: project-local Kanban for LLM development sessions
 Usage:
   agent-kanban context --cwd <path> [--branch <name>] [--json]
   agent-kanban start --cwd <path> [--branch <name>] [--session <id>]
-  agent-kanban list --cwd <path> [--status ready] [--kind task] [--epic KBN-1001] [--json]
-  agent-kanban create "Title" --cwd <path> [--type task|epic] [--epic KBN-1001] [--priority high] [--status ready] [--tags api,ui] [--next "..."]
+  agent-kanban list --cwd <path> [--project name] [--status ready] [--kind task] [--epic KBN-1001] [--sprint 0.2.0] [--gate G1] [--json]
+  agent-kanban create "Title" --cwd <path> [--type task|epic] [--epic KBN-1001] [--sprint 0.2.0] [--gate G1] [--priority high] [--status ready] [--tags api,ui] [--next "..."]
+  agent-kanban set <card-id> --cwd <path> [--sprint 0.2.0|none] [--gate G1|none] [--epic KBN-1001|none] [--project name]
   agent-kanban claim <card-id> --cwd <path> --session <id>
   agent-kanban move <card-id> <status> --cwd <path>
   agent-kanban progress <card-id> --cwd <path> --msg "..." [--files a,b] [--next "..."] [--test-command "..."] [--test-status passed] [--test-summary "..."]
@@ -42,6 +43,10 @@ async function main() {
         case "create":
         case "new":
             await createCommand(store, parsed, cwd, json);
+            break;
+        case "set":
+        case "update":
+            await setCommand(store, parsed, cwd, json);
             break;
         case "claim":
             await claimCommand(store, parsed, cwd, json);
@@ -93,6 +98,9 @@ async function listCommand(store, flags, json) {
         status: stringFlag(flags, "status"),
         kind: stringFlag(flags, "kind"),
         epicId: stringFlag(flags, "epic") ?? stringFlag(flags, "epic-id"),
+        sprint: stringFlag(flags, "sprint"),
+        gate: stringFlag(flags, "gate"),
+        project: stringFlag(flags, "project"),
         branch: stringFlag(flags, "branch"),
         tag: stringFlag(flags, "tag"),
         query: stringFlag(flags, "query"),
@@ -115,8 +123,33 @@ async function createCommand(store, parsed, cwd, json) {
         status: stringFlag(parsed.flags, "status") ?? "backlog",
         kind: (stringFlag(parsed.flags, "type") ?? stringFlag(parsed.flags, "kind")),
         epicId: stringFlag(parsed.flags, "epic") ?? stringFlag(parsed.flags, "epic-id"),
+        sprint: stringFlag(parsed.flags, "sprint"),
+        gate: stringFlag(parsed.flags, "gate"),
         priority: stringFlag(parsed.flags, "priority") ?? "medium",
+        project: stringFlag(parsed.flags, "project"),
         tags: csvFlag(parsed.flags, "tags"),
+        nextAction: stringFlag(parsed.flags, "next")
+    });
+    write(json ? JSON.stringify(card, null, 2) : compactCard(card));
+}
+async function setCommand(store, parsed, cwd, json) {
+    const cardId = requirePositional(parsed, 0, "card-id");
+    const type = (stringFlag(parsed.flags, "type") ?? stringFlag(parsed.flags, "kind"));
+    const epicId = firstDefined(nullableFlag(parsed.flags, "epic"), nullableFlag(parsed.flags, "epic-id"));
+    const card = await store.updateCard({
+        cardId,
+        cwd,
+        title: stringFlag(parsed.flags, "title"),
+        description: stringFlag(parsed.flags, "desc") ?? stringFlag(parsed.flags, "description"),
+        kind: type,
+        epicId,
+        sprint: nullableFlag(parsed.flags, "sprint"),
+        gate: nullableFlag(parsed.flags, "gate"),
+        status: stringFlag(parsed.flags, "status"),
+        priority: stringFlag(parsed.flags, "priority"),
+        project: stringFlag(parsed.flags, "project"),
+        branch: nullableFlag(parsed.flags, "branch"),
+        tags: tagsUpdateFlag(parsed.flags),
         nextAction: stringFlag(parsed.flags, "next")
     });
     write(json ? JSON.stringify(card, null, 2) : compactCard(card));
@@ -209,6 +242,8 @@ function compactCard(card) {
         card.id,
         `type=${card.kind}`,
         card.epicId ? `epic=${card.epicId}` : "",
+        card.sprint ? `sprint=${quote(card.sprint)}` : "",
+        card.gate ? `gate=${card.gate}` : "",
         `status=${card.status}`,
         `priority=${card.priority}`,
         `title=${quote(card.title)}`,
@@ -281,6 +316,26 @@ function csvFlag(flags, name) {
         .split(",")
         .map((item) => item.trim())
         .filter(Boolean);
+}
+function nullableFlag(flags, name) {
+    const value = stringFlag(flags, name);
+    if (value === undefined)
+        return undefined;
+    return value.toLowerCase() === "none" ? null : value;
+}
+function tagsUpdateFlag(flags) {
+    const value = stringFlag(flags, "tags");
+    if (value === undefined)
+        return undefined;
+    if (value.toLowerCase() === "none")
+        return null;
+    return value
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+}
+function firstDefined(...values) {
+    return values.find((value) => value !== undefined);
 }
 function requirePositional(parsed, index, label) {
     const value = parsed.positionals[index];

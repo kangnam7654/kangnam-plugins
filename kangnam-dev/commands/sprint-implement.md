@@ -1,7 +1,6 @@
 ---
 description: "스프린트 구현. Kanban 카드별 gate/domain 라벨에 따라 구현 에이전트 dispatch → gate-verifier가 검증 + progress.md + 카드 갱신. 순차 기본, --parallel 병렬."
 argument-hint: "<project> <version> [--parallel] [--gates G1,G2,...] [--working-dir <path>]"
-disable-model-invocation: true
 ---
 
 Raw slash-command arguments:
@@ -43,7 +42,7 @@ uv run <plugin-root>/scripts/sprint/sprint-implement.py $ARGUMENTS --json
 
 ```
 card:
-  id: 260509-1420
+  id: KBN-1002
   title: [0.0.8 G1] POST /todos 동작 검증
 gate_id: G1
 heading: POST /todos 동작 검증
@@ -146,7 +145,7 @@ Your task:
    `[<gate_id>.reaction]` as the corresponding scenario becomes implemented.
    One commit may carry multiple tags.
 4. Do NOT run the verification commands yourself. gate-verifier does that next.
-5. Do NOT edit ~/wiki/ card/progress files. Stay inside <working_directory>. gate-verifier will update progress.md and move the card.
+5. Do NOT edit `.kanban/kanban-data.json` or progress.md by hand. Stay inside <working_directory>. gate-verifier will update progress.md and move the card through agent-kanban.
 
 Report on completion:
   status: ready_for_verification | incomplete
@@ -194,9 +193,9 @@ verifier 결과 캡처:
 각 게이트 끝날 때마다 한 줄:
 
 ```
-✓ [260509-1420] G1 (backend, passed) — backend-dev 3 commits, verifier all green, 카드 Done
-⚠️ [260509-1430] G2 (frontend, partial) — happy 통과, isolation 명령 실패 (자세히 보려면 progress.md)
-✗ [260509-1440] G3 (mobile, incomplete) — mobile-dev 보고: simulator 부팅 실패
+✓ [KBN-1002] G1 (backend, passed) — backend-dev 3 commits, verifier all green, 카드 Done
+⚠️ [KBN-1003] G2 (frontend, partial) — happy 통과, isolation 명령 실패 (자세히 보려면 progress.md)
+✗ [KBN-1004] G3 (mobile, incomplete) — mobile-dev 보고: simulator 부팅 실패
 ```
 
 ### Step 7 · 전체 완료 시 요약

@@ -1,7 +1,6 @@
 ---
 description: "스프린트 진행 상황 추적. progress.md 스캐폴드 + 게이트 상태 + Kanban 정합성 + --freeze 동결."
 argument-hint: "<project> <version> [--freeze]"
-disable-model-invocation: true
 ---
 
 Raw slash-command arguments:
@@ -59,12 +58,12 @@ uv run <plugin-root>/scripts/sprint/sprint-progress.py $ARGUMENTS
 1. **게이트 ✅인데 카드는 Done 아님** — 검증 끝났지만 보드 안 옮김
 2. **카드 Done인데 게이트는 [ ]** — 보드 옮겼지만 검증 메모 누락
 
-매칭 키: `progress.md`의 `### G<N>` 헤딩 ↔ 카드 frontmatter의 `gate: G<N>` 필드. (sprint-planning이 `sprint-publish-cards.py`로 발행한 카드는 `gate` 필드를 자동으로 가짐.)
+매칭 키: `progress.md`의 `### G<N>` 헤딩 ↔ project-local Kanban 카드의 `gate: G<N>` 메타데이터. (sprint-planning이 `sprint-publish-cards.py`로 발행한 카드는 `gate` 필드를 자동으로 가짐.)
 
 자동 이동은 **하지 않는다** — 검증 메모는 사람이 직접 채워야 하므로. 스크립트는 경고와 명령어 힌트만 제공:
 
 ```bash
-uv run <plugin-root>/skills/kanban/scripts/kanban-move.py <id> done
+<plugin-root>/scripts/agent-kanban/agent-kanban.sh done <id> --cwd <working_dir> --summary "<gate> 검증 완료"
 ```
 
 사용자가 결정 후 직접 실행.

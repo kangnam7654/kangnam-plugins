@@ -1,7 +1,6 @@
 ---
 description: "Automated diagnosis and improvement pipeline for existing apps. Audits codebase across code quality, security, architecture, DB, tests, UX/UI, then prioritizes and executes design, implementation, and verification."
 argument-hint: "[--code|--security|--arch|--db|--test|--repo|--ui] [--bm] [--design] <codebase path>"
-disable-model-invocation: true
 ---
 
 Raw slash-command arguments:
