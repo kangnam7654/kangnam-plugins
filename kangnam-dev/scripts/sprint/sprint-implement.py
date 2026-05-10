@@ -7,15 +7,14 @@
 
 This script intentionally does not call agents. Slash-command orchestration still
 owns dispatch. The script makes the fragile parts deterministic: path/version
-normalization, progress.md scaffolding, gate parsing, incomplete-gate detection,
-and done/partial/pending classification.
+normalization, gate parsing, incomplete-gate detection, and card-based done
+classification.
 """
 from __future__ import annotations
 
 import argparse
 import json
 import re
-import subprocess
 import sys
 from pathlib import Path
 
@@ -115,48 +114,6 @@ def parse_gate_blocks(planning_path: Path) -> list[dict]:
     return gates
 
 
-def scaffold_progress(project: str, version: str, progress_path: Path, working_dir: Path) -> None:
-    if progress_path.is_file():
-        return
-    script = Path(__file__).parent / "sprint-progress.py"
-    subprocess.run(
-        [sys.executable, str(script), project, version],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-
-
-def progress_gate_status(progress_path: Path) -> dict[str, str]:
-    if not progress_path.is_file():
-        return {}
-    text = progress_path.read_text(encoding="utf-8")
-    m = re.search(r"^## 게이트\s*\n(.*?)(?=\n## |\Z)", text, re.S | re.M)
-    if not m:
-        return {}
-    section = m.group(1)
-    heading_re = re.compile(r"^###\s+(G\d+)\b.*$", re.M)
-    hits = list(heading_re.finditer(section))
-    out: dict[str, str] = {}
-    for i, hit in enumerate(hits):
-        gate_id = hit.group(1)
-        start = hit.end()
-        end = hits[i + 1].start() if i + 1 < len(hits) else len(section)
-        block = section[start:end]
-        checks = re.findall(r"^-\s+\[([ x])\]\s+\*\*(happy|isolation_failure|expected_reaction)\*\*\s+—\s+(.+?)$", block, re.M)
-        if len(checks) < 3:
-            out[gate_id] = "pending"
-            continue
-        checked = [mark == "x" and "<검증 메모" not in memo and "manual verification required" not in memo for mark, _, memo in checks]
-        if all(checked):
-            out[gate_id] = "done"
-        elif any(checked):
-            out[gate_id] = "partial"
-        else:
-            out[gate_id] = "pending"
-    return out
-
-
 def sprint_cards(project: str, version: str, working_dir: Path) -> list[dict]:
     """Return non-epic kanban cards for project+sprint across active columns."""
     cards: list[dict] = []
@@ -199,14 +156,11 @@ def main() -> None:
 
     sd = sprint_dir(args.project, version)
     planning_path = sd / "planning.md"
-    progress_path = sd / "progress.md"
     if not planning_path.is_file():
         print(f"error: planning.md missing: {planning_path}", file=sys.stderr)
         sys.exit(2)
 
-    scaffold_progress(args.project, version, progress_path, working_dir)
     all_gates = parse_gate_blocks(planning_path)
-    statuses = progress_gate_status(progress_path)
     cards = sprint_cards(args.project, version, working_dir)
     gate_to_card, card_only, duplicate_card_gates = cards_by_gate(cards)
 
@@ -233,19 +187,20 @@ def main() -> None:
     dispatch = [
         {
             **g,
-            "progress_status": statuses.get(g["gate_id"], "pending"),
+            "card_status": (g.get("card") or {}).get("status", "missing"),
         }
         for g in gates
-        if not g["problems"] and statuses.get(g["gate_id"], "pending") != "done"
+        if not g["problems"] and (g.get("card") or {}).get("status") != "done"
     ]
     skipped_done = [
         {
             "gate_id": g["gate_id"],
             "heading": g["heading"],
             "domain": g["domain"],
+            "card": g.get("card"),
         }
         for g in gates
-        if not g["problems"] and statuses.get(g["gate_id"], "pending") == "done"
+        if not g["problems"] and (g.get("card") or {}).get("status") == "done"
     ]
 
     report = {
@@ -253,7 +208,6 @@ def main() -> None:
         "version": version,
         "working_dir": str(working_dir),
         "planning_path": str(planning_path),
-        "progress_path": str(progress_path),
         "total_gates": len(gates),
         "dispatch_count": len(dispatch),
         "incomplete_count": len(incomplete),
@@ -272,7 +226,6 @@ def main() -> None:
 
     print(f"\n=== {args.project} {version} 구현 인벤토리 ===")
     print(f"  planning: {planning_path}")
-    print(f"  progress: {progress_path}")
     print(f"  working_dir: {working_dir}")
     print(f"  cards: {len(cards)}")
     print(f"  dispatch 대상: {len(dispatch)} / incomplete: {len(incomplete)} / done skip: {len(skipped_done)}")
@@ -289,7 +242,7 @@ def main() -> None:
         for gate in dispatch:
             card = gate.get("card") or {}
             card_label = f"[{card.get('id')}] {card.get('title')}" if card else "(card missing)"
-            print(f"  - {gate['gate_id']} {card_label} ({gate['domain']}, {gate['progress_status']}) — {gate['heading']}")
+            print(f"  - {gate['gate_id']} {card_label} ({gate['domain']}, {gate['card_status']}) — {gate['heading']}")
     elif not incomplete:
         print("\nDispatch queue empty. All selected gates are done.")
 

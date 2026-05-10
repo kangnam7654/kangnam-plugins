@@ -100,38 +100,6 @@ sprint: 0.2.0
     )
 
 
-def write_progress(path: Path, checked: bool = False) -> None:
-    mark = "x" if checked else " "
-    memo = "실제 프로젝트별 칸반 흐름에서 충분한 검증을 완료함 2026-05-10" if checked else "<검증 메모, 날짜>"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        f"""---
-created: 2026-05-10
-updated: 2026-05-10
-type: project_spec
-status: growing
-project: demo
-sprint: 0.2.0
----
-
-# demo — 0.2.0 Readiness Gates (DRAFT)
-
-## 게이트
-
-### G1. 로그인 실패 메시지 수정
-- [{mark}] **happy** — {memo}
-- [{mark}] **isolation_failure** — {memo}
-- [{mark}] **expected_reaction** — {memo}
-
-## 검증 로그
-
-| 날짜 | 게이트 | 결과 | 메모 |
-|---|---|---|---|
-""",
-        encoding="utf-8",
-    )
-
-
 def init_workspace(tmp_path: Path) -> tuple[Path, Path, Path]:
     home = tmp_path / "home"
     wiki = home / "wiki"
@@ -288,8 +256,6 @@ def test_publish_then_implement_dispatches_project_local_cards(tmp_path: Path, m
   - 검증: `manual`
 """,
     )
-    write_progress(planning_dir / "progress.md", checked=False)
-
     for module in (publish, sprint_implement):
         monkeypatch.setenv("HOME", str(home))
         monkeypatch.setattr(module, "project_dir", lambda project: wiki / "Projects" / project)
@@ -311,6 +277,7 @@ def test_publish_then_implement_dispatches_project_local_cards(tmp_path: Path, m
     assert report["incomplete_count"] == 0
     assert [gate["card"]["id"] for gate in report["dispatch"]] == [task["id"], created_id.group(1)]
     assert "review-target.py" in report["dispatch"][1]["scenarios"]["happy"]["verification"]
+    assert not (planning_dir / "progress.md").exists()
 
 
 def test_full_sprint_cli_flow_with_project_local_kanban(tmp_path: Path) -> None:
@@ -390,19 +357,9 @@ def test_full_sprint_cli_flow_with_project_local_kanban(tmp_path: Path) -> None:
     assert implementation["dispatch_count"] == 2
     assert [gate["card"]["id"] for gate in implementation["dispatch"]] == [task["id"], child_id.group(1)]
 
-    progress_path = sprint_root / "progress.md"
-    progress_text = progress_path.read_text(encoding="utf-8")
-    progress_text = re.sub(
-        r"- \[ \] \*\*(happy|isolation_failure|expected_reaction)\*\* — <검증 메모, 날짜>",
-        r"- [x] **\1** — 실제 CLI 스프린트 흐름에서 충분한 검증을 완료함 2026-05-10",
-        progress_text,
-    )
-    progress_path.write_text(progress_text, encoding="utf-8")
-
     run_agent(project_dir, "done", task["id"], "--summary", "G1 검증 완료")
     run_agent(project_dir, "done", child_id.group(1), "--summary", "G2 검증 완료")
-    run_cli(home, "kangnam-dev/scripts/sprint/sprint-progress.py", "demo", "0.2.0", "--working-dir", str(project_dir), "--freeze")
-    assert read_frontmatter(progress_path)["status"] == "evergreen"
+    assert not (sprint_root / "progress.md").exists()
 
     run_cli(home, "kangnam-dev/scripts/sprint/sprint-review.py", "demo", "0.2.0", "--working-dir", str(project_dir))
     review_path = sprint_root / "review.md"

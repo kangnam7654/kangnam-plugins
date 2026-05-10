@@ -10,7 +10,7 @@ Raw slash-command arguments:
 
 `<plugin-root>`는 이 plugin의 `kangnam-dev/` 디렉토리다. 체크아웃에서 실행하면 `/Users/kangnam/projects/kangnam-plugins/kangnam-dev`, 설치본에서 실행하면 설치된 plugin의 `kangnam-dev` 루트로 해석한다.
 
-스프린트 종료 시점의 리뷰/회고. **Python 스크립트가 progress와 Kanban 카드 완료 상태를 검증하고 review.md 골격을 만들며**, 그 다음 산출물 리뷰와 retrospective 스킬로 4L 본문(Liked/Learned/Lacked/Longed For)을 채운다.
+스프린트 종료 시점의 리뷰/회고. **Python 스크립트가 Kanban 카드 완료 상태를 검증하고 review.md 골격을 만들며**, 그 다음 산출물 리뷰와 retrospective 스킬로 4L 본문(Liked/Learned/Lacked/Longed For)을 채운다.
 
 ## 절차
 
@@ -21,9 +21,8 @@ uv run <plugin-root>/scripts/sprint/sprint-review.py $ARGUMENTS
 ```
 
 스크립트 동작:
-- progress.md가 `status: evergreen`인지 확인 (아니면 거부; `--allow-unfrozen`으로 draft 모드)
 - 스프린트 Kanban 카드가 존재하고 모두 `Done`인지 확인 (아니면 거부; `--allow-open-cards`로 draft/legacy 모드)
-- planning.md `created` ~ progress.md `updated`로 period 자동 계산
+- planning.md `created` ~ Done 카드의 최신 완료 시각으로 period 자동 계산
 - planning.md의 Core Gates 개수 카운트
 - Done 카드 목록을 retrospective 컨텍스트에 포함
 - review.md 스캐폴드 생성 (4L 섹션 placeholder + Action Items 빈자리)
@@ -33,12 +32,12 @@ uv run <plugin-root>/scripts/sprint/sprint-review.py $ARGUMENTS
 
 retro를 쓰기 전에 다음을 먼저 확인하고 review.md의 “스프린트 개요”에 반영한다:
 
-- planning.md Core Gates가 progress.md에서 모두 검증 완료됐는가
+- planning.md Core Gates가 모두 Done 카드로 닫혔는가
 - Done 카드의 구현 산출물이 해당 gate/card 범위와 일치하는가
 - 실패/부분 완료/수동 검증/이월 항목이 있으면 retro 전에 명시되어 있는가
-- 코드 변경이 있었다면 테스트/빌드/수동 검증 로그가 progress.md에 남아 있는가
+- 코드 변경이 있었다면 테스트/빌드/수동 검증 로그가 카드 activity/test log에 남아 있는가
 
-산출물 리뷰에서 blocker가 발견되면 retrospective 작성으로 넘어가지 말고, progress/card 상태를 먼저 바로잡는다.
+산출물 리뷰에서 blocker가 발견되면 retrospective 작성으로 넘어가지 말고, card 상태를 먼저 바로잡는다.
 
 ### Step 3 · retrospective 스킬 호출
 
@@ -49,11 +48,10 @@ mode: sprint
 project: <project>
 sprint: <version>
 period_start: <planning.md created>
-period_end: <progress.md updated>
+period_end: <latest Done card completedAt>
 output_path: ~/wiki/Projects/<project>/Sprints/<version>/review.md
 context_files:
   - planning.md
-  - progress.md
 done_cards:
   - [card-id] title (path gate=G1)
 ```
@@ -99,16 +97,15 @@ push 안 함.
 
 ## NEVER 규칙
 
-1. NEVER: progress.md가 evergreen 아닌데 review를 evergreen으로 만들지 마라 (스크립트가 자동으로 draft로 시작).
-2. NEVER: 열린 Kanban 카드가 남아 있는데 review를 evergreen으로 만들지 마라.
-3. NEVER: 산출물 리뷰 blocker가 남아 있는데 retrospective를 완료 처리하지 마라.
-4. NEVER: 4L 카테고리 임의 변형하지 마라 — `~/wiki/Concepts/4L-Retrospective.md` SSOT.
-5. NEVER: Action Items가 비어있는 review.md commit하지 마라.
-6. NEVER: Rule 업데이트를 사용자 승인 없이 자동 적용하지 마라.
+1. NEVER: 열린 Kanban 카드가 남아 있는데 review를 evergreen으로 만들지 마라.
+2. NEVER: 산출물 리뷰 blocker가 남아 있는데 retrospective를 완료 처리하지 마라.
+3. NEVER: 4L 카테고리 임의 변형하지 마라 — `~/wiki/Concepts/4L-Retrospective.md` SSOT.
+4. NEVER: Action Items가 비어있는 review.md commit하지 마라.
+5. NEVER: Rule 업데이트를 사용자 승인 없이 자동 적용하지 마라.
 
 ## ALWAYS 규칙
 
 1. ALWAYS: 스크립트로 스캐폴드 → 산출물 리뷰 → retrospective 스킬로 본문 작성 순서.
-2. ALWAYS: planning.md + progress.md + Done 카드 목록을 컨텍스트로 retrospective에 전달.
+2. ALWAYS: planning.md + Done 카드 목록을 컨텍스트로 retrospective에 전달.
 3. ALWAYS: review.md를 `Projects/<project>/Sprints/<version>/review.md`에 저장.
 4. ALWAYS: Action Items 섹션 + Rule 업데이트 후보 승인/적용 여부로 마무리.

@@ -1,6 +1,7 @@
 """Shared utilities for sprint-* scripts.
 
-Sprints live at ~/wiki/Projects/<project>/Sprints/<version>/{planning,progress,review}.md.
+Sprints live at ~/wiki/Projects/<project>/Sprints/<version>/{planning,review}.md.
+Gate execution state lives in the project-local `.kanban/kanban-data.json`.
 The folder name is the version label. Project-level convention determines whether
 versions carry a 'v' prefix (e.g., dear-jeongbin uses v0.1.0; auto_company uses 0.0.1).
 """

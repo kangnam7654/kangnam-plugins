@@ -9,8 +9,8 @@ Usage:
   sprint-review.py <project> <version> [--force]
 
 What it does (safe / structured parts):
-- Validates progress.md is frozen (status: evergreen) — warns if not
-- Reads planning.md + progress.md to derive period/gates
+- Validates sprint kanban cards are all Done
+- Reads planning.md + done card metadata to derive period/gates
 - Creates review.md skeleton with frontmatter + period + gate summary
 - Prints retrospective context bundle for AI to fill in 4L sections
 
@@ -47,10 +47,6 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("version")
     p.add_argument("--force", action="store_true", help="Overwrite existing review.md")
     p.add_argument(
-        "--allow-unfrozen", action="store_true",
-        help="Allow scaffolding review.md even if progress.md is not evergreen",
-    )
-    p.add_argument(
         "--allow-open-cards",
         action="store_true",
         help="Allow scaffolding review.md even if sprint kanban cards are not all Done",
@@ -72,6 +68,8 @@ def sprint_cards(project: str, version: str, working_dir: Path) -> tuple[list[di
             "gate": card.get("gate") or "",
             "column": card.get("column") or card.get("status"),
             "path": card.get("path"),
+            "completedAt": card.get("completedAt"),
+            "updatedAt": card.get("updatedAt"),
         }
         if card.get("status") == "done":
             done_cards.append(normalized)
@@ -88,7 +86,7 @@ _{period}_
 
 ## 스프린트 개요
 
-- 게이트별 결과: **채워주세요** (planning.md의 Core Gates와 progress.md의 검증 로그 참고)
+- 게이트별 결과: **채워주세요** (planning.md의 Core Gates와 Done 카드의 테스트/활동 로그 참고)
 - commit 흐름: **채워주세요**
 - 의도와 다르게 흘러간 것: **채워주세요**
 
@@ -135,36 +133,10 @@ def main() -> None:
     working_dir = project_working_dir(args.project, args.working_dir)
     sd = sprint_dir(args.project, version)
     planning_path = sd / "planning.md"
-    progress_path = sd / "progress.md"
     review_path = sd / "review.md"
 
     if not planning_path.is_file():
         print(f"error: planning.md missing: {planning_path}", file=sys.stderr)
-        sys.exit(2)
-    if not progress_path.is_file():
-        print(f"error: progress.md missing: {progress_path}", file=sys.stderr)
-        sys.exit(2)
-
-    try:
-        progress_fm, _ = parse_frontmatter(progress_path)
-    except FrontmatterError as e:
-        print(f"error: {e}", file=sys.stderr)
-        sys.exit(2)
-    if "status" not in progress_fm:
-        print(
-            f"error: progress.md frontmatter has no 'status' field. "
-            f"Cannot determine if frozen. Fix the file before retry.",
-            file=sys.stderr,
-        )
-        sys.exit(2)
-    progress_status = progress_fm["status"]
-    if progress_status != "evergreen" and not args.allow_unfrozen:
-        print(
-            f"error: progress.md is not frozen (status={progress_status}).\n"
-            f"Run: sprint-progress.py {args.project} {version} --freeze\n"
-            f"Or pass --allow-unfrozen to write a draft review.md.",
-            file=sys.stderr,
-        )
         sys.exit(2)
 
     gates = extract_core_gates(planning_path)
@@ -202,10 +174,15 @@ def main() -> None:
         print(f"error: {e}", file=sys.stderr)
         sys.exit(2)
     period_start = planning_fm.get("created", "?")
-    period_end = progress_fm.get("updated", today())
+    done_dates = [
+        str(card.get("completedAt") or card.get("updatedAt") or "")
+        for card in done_cards
+        if card.get("completedAt") or card.get("updatedAt")
+    ]
+    period_end = max(done_dates) if done_dates else today()
     period = f"{period_start} ~ {period_end}"
 
-    review_status = "growing" if progress_status == "evergreen" else "draft"
+    review_status = "draft" if open_cards else "growing"
 
     fm = {
         "created": today(),
@@ -245,7 +222,6 @@ def main() -> None:
     print(f"    output_path: {review_path}")
     print(f"    context_files:")
     print(f"      - {planning_path}")
-    print(f"      - {progress_path}")
     if done_cards:
         print(f"    done_cards:")
         for card in done_cards:

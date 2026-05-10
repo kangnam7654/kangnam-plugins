@@ -1,5 +1,5 @@
 ---
-description: "스프린트 구현. Kanban 카드별 gate/domain 라벨에 따라 구현 에이전트 dispatch → gate-verifier가 검증 + progress.md + 카드 갱신. 순차 기본, --parallel 병렬."
+description: "스프린트 구현. Kanban 카드별 gate/domain 라벨에 따라 구현 에이전트 dispatch → gate-verifier가 검증 + 카드 로그/상태 갱신. 순차 기본, --parallel 병렬."
 argument-hint: "<project> <version> [--parallel] [--gates G1,G2,...] [--working-dir <path>]"
 ---
 
@@ -10,7 +10,7 @@ Raw slash-command arguments:
 
 `<plugin-root>`는 이 plugin의 `kangnam-dev/` 디렉토리다. 체크아웃에서 실행하면 `/Users/kangnam/projects/kangnam-plugins/kangnam-dev`, 설치본에서 실행하면 설치된 plugin의 `kangnam-dev` 루트로 해석한다.
 
-planning에서 발행된 **Kanban 카드**를 하나씩 구현한다. 각 카드는 planning.md의 Core Gate(`gate: G1` 등)에 연결돼 있어야 하며, 구현은 카드 단위로 진행하고 검증은 gate-verifier가 progress.md와 카드 상태에 기록한다.
+planning에서 발행된 **Kanban 카드**를 하나씩 구현한다. 각 카드는 planning.md의 Core Gate(`gate: G1` 등)에 연결돼 있어야 하며, 구현과 검증 기록은 카드 단위로 남긴다.
 
 ## 절차
 
@@ -25,16 +25,15 @@ planning에서 발행된 **Kanban 카드**를 하나씩 구현한다. 각 카드
 - `--gates G1,G3` — 특정 게이트만 구현 (default: 미완료 게이트 전부)
 - `--working-dir <path>` — 코드 디렉토리. default: `~/projects/<project>`
 
-### Step 1 · planning.md / progress.md 로드
+### Step 1 · planning.md / Kanban 로드
 
 ```bash
 PLAN=~/wiki/Projects/<project>/Sprints/<version>/planning.md
-PROG=~/wiki/Projects/<project>/Sprints/<version>/progress.md
 uv run <plugin-root>/scripts/sprint/sprint-implement.py $ARGUMENTS --json
 ```
 
 - planning.md 없음 → "먼저 `/kangnam-dev:sprint-planning <project> <version>` 실행" 안내 후 종료.
-- progress.md 없음 → `sprint-implement.py`가 `sprint-progress.py <project> <version>`를 호출해 스캐폴드 생성.
+- sprint gate 카드 없음 → "먼저 `/kangnam-dev:sprint-planning <project> <version>`에서 카드 발행/연결" 안내 후 종료.
 
 ### Step 2 · 게이트 인벤토리
 
@@ -65,13 +64,12 @@ scenarios:
 
 ### Step 3 · 미완료 게이트 추려내기
 
-각 게이트가 progress.md에서 다음 상태 중 어느 것인지 `sprint-implement.py`가 판단:
+각 게이트가 project-local Kanban에서 다음 상태 중 어느 것인지 `sprint-implement.py`가 판단:
 
-- **done** — 세 시나리오 모두 `- [x]` + 메모(placeholder/manual_pending 아님)
-- **partial** — 일부만 `[x]`
-- **pending** — 전부 `[ ]`
+- **done** — gate 카드가 `done`
+- **not done** — gate 카드가 `backlog`, `ready`, `in_progress`, `review`, `blocked`
 
-기본 동작: `pending` + `partial`인 게이트만 dispatch. `done`은 skip.
+기본 동작: `done`이 아닌 게이트만 dispatch. `done`은 skip.
 `--gates G1,G3` 지정 시 그 ID 중 done이 아닌 것만.
 
 ### Step 4 · 의존성 분석 (지금은 단순 순차)
@@ -145,7 +143,7 @@ Your task:
    `[<gate_id>.reaction]` as the corresponding scenario becomes implemented.
    One commit may carry multiple tags.
 4. Do NOT run the verification commands yourself. gate-verifier does that next.
-5. Do NOT edit `.kanban/kanban-data.json` or progress.md by hand. Stay inside <working_directory>. gate-verifier will update progress.md and move the card through agent-kanban.
+5. Do NOT edit `.kanban/kanban-data.json` by hand. Stay inside <working_directory>. gate-verifier will update the card through agent-kanban.
 
 Report on completion:
   status: ready_for_verification | incomplete
@@ -177,7 +175,6 @@ version: <version>
 gate_id: <gate_id>
 working_dir: <working-dir, absolute>
 planning_path: <abs path to planning.md>
-progress_path: <abs path to progress.md>
 
 Read your instructions in gate-verifier.md and execute.
 ```
@@ -194,7 +191,7 @@ verifier 결과 캡처:
 
 ```
 ✓ [KBN-1002] G1 (backend, passed) — backend-dev 3 commits, verifier all green, 카드 Done
-⚠️ [KBN-1003] G2 (frontend, partial) — happy 통과, isolation 명령 실패 (자세히 보려면 progress.md)
+⚠️ [KBN-1003] G2 (frontend, partial) — happy 통과, isolation 명령 실패 (자세히 보려면 카드 activity/test log)
 ✗ [KBN-1004] G3 (mobile, incomplete) — mobile-dev 보고: simulator 부팅 실패
 ```
 
@@ -209,10 +206,10 @@ verifier 결과 캡처:
   ❌ failed/incomplete: 1
 다음 액션:
   - G3 mobile-dev 차단 사항 해결 후 재실행
-  - 또는: /kangnam-dev:sprint-progress <project> <version> 으로 현재 상태 확인
+  - 또는: project-local Kanban에서 blocked/review 카드 확인
 ```
 
-`git -C ~/wiki commit` 자동 실행 X — progress.md 변경분은 verifier가 이미 박았으므로 사용자가 검토 후 직접 commit.
+`git -C ~/wiki commit` 자동 실행 X — planning/review 문서 변경은 사용자가 검토 후 직접 commit.
 
 ## NEVER 규칙
 
@@ -227,9 +224,9 @@ verifier 결과 캡처:
 
 ## ALWAYS 규칙
 
-1. ALWAYS: 카드 dispatch 전에 그 카드의 gate가 progress.md에서 done인지 확인 (idempotent — 재실행해도 done은 skip).
+1. ALWAYS: 카드 dispatch 전에 그 카드가 Done인지 확인 (idempotent — 재실행해도 Done은 skip).
 2. ALWAYS: 도메인 에이전트 prompt에 카드 정보 + 게이트의 5개 필드 모두 풀어 전달 (요약 X).
-3. ALWAYS: gate-verifier prompt에 working_dir, planning_path, progress_path를 절대 경로로 전달.
+3. ALWAYS: gate-verifier prompt에 working_dir, planning_path를 절대 경로로 전달.
 4. ALWAYS: 한 게이트 끝날 때마다 한 줄 진행 보고. 무음 X.
 5. ALWAYS: 전체 끝나면 요약 + 다음 액션 제안.
 6. ALWAYS: `--parallel` 사용 시 사용자에게 명시적으로 "병렬 dispatch — 의존성 직접 책임" 한 번 경고.
